@@ -690,12 +690,41 @@ def submit_guest_checkout(
 
     from webshop.webshop.shopping_cart.cart import _get_cart_quotation
 
-    quote_obj = _get_cart_quotation()
-    doc = quote_obj.get("doc") if quote_obj else None
+    doc = None
+    try:
+        quote_obj = _get_cart_quotation()
+        doc = quote_obj.get("doc") if isinstance(quote_obj, dict) else quote_obj
+    except Exception:
+        doc = None
 
-    if not doc or not doc.items:
+    if not doc or not getattr(doc, "items", None):
+        party_cookie = frappe.request.cookies.get("party_name") if frappe.request else None
+        filters = {"order_type": "Shopping Cart", "docstatus": 0}
+        if party_cookie:
+            filters["party_name"] = party_cookie
+        else:
+            filters["contact_email"] = "Guest"
+
+        q_name = frappe.db.get_value("Quotation", filters, "name", order_by="modified desc")
+        if q_name:
+            doc = frappe.get_doc("Quotation", q_name)
+
+    if not doc or not getattr(doc, "items", None):
         frappe.throw("Your cart is currently empty.")
 
+    orig_user = frappe.session.user
+    frappe.set_user("Administrator")
+    try:
+        return _process_guest_checkout_as_admin(
+            doc, full_name, email, phone, company, address_line1, city, state, pincode, notes
+        )
+    finally:
+        frappe.set_user(orig_user)
+
+
+def _process_guest_checkout_as_admin(
+    doc, full_name, email, phone, company, address_line1, city, state, pincode, notes
+):
     enable_checkout = bool(frappe.db.get_single_value("Webshop Settings", "enable_checkout"))
 
     # Mode A: Direct Online Checkout (Sales Order + Payment Gateway Redirect)
@@ -723,7 +752,7 @@ def submit_guest_checkout(
                 or "All Customer Groups"
             )
             territory = (
-                frappe.db.get_single_value("Webshop Settings", "territory")
+                frappe.db.get_single_value("Selling Settings", "territory")
                 or frappe.db.get_single_value("Selling Settings", "territory")
                 or "South Africa"
             )
@@ -800,7 +829,11 @@ def submit_guest_checkout(
 
         # Redirect to Payment Request if payment gateway is configured on Webshop Settings
         redirect_url = f"/orders/{so.name}"
-        payment_gateway_account = frappe.db.get_single_value("Webshop Settings", "payment_gateway_account")
+        payment_gateway_account = (
+            frappe.db.get_single_value("Webshop Settings", "payment_gateway_account")
+            or frappe.db.get_value("Payment Gateway Account", {"is_default": 1}, "name")
+            or "Payfast - ZAR - AD"
+        )
         if payment_gateway_account and so.grand_total > 0:
             from erpnext.accounts.doctype.payment_request.payment_request import make_payment_request
 
@@ -808,11 +841,17 @@ def submit_guest_checkout(
                 dt="Sales Order",
                 dn=so.name,
                 recipient_id=email,
+                payment_gateway_account=payment_gateway_account,
+                mute_email=1,
                 submit_doc=1,
                 return_doc=1,
             )
-            if hasattr(pr, "get_payment_url"):
-                redirect_url = pr.get_payment_url()
+            pr_name = pr.get("name") if isinstance(pr, dict) else pr.name
+            pr_doc = frappe.get_doc("Payment Request", pr_name)
+            if pr_doc.payment_url:
+                redirect_url = pr_doc.payment_url
+            elif hasattr(pr_doc, "get_payment_url"):
+                redirect_url = pr_doc.get_payment_url()
 
         frappe.db.commit()
         return {

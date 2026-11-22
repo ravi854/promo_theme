@@ -15,7 +15,7 @@ web_include_js = [
 	"/assets/promo_theme/js/promo_search.js?v=1",
 	"/assets/promo_theme/js/promo_whatsapp.js?v=13",
 	"/assets/promo_theme/js/promo_chat.js?v=4",
-	"/assets/promo_theme/js/promo_guest_checkout.js?v=1"
+	"/assets/promo_theme/js/promo_guest_checkout.js?v=5"
 ]
 
 
@@ -25,7 +25,7 @@ override_whitelisted_methods = {
 }
 
 
-template_apps = ["builder","promo_theme", "webshop", "helpdesk", "crm", "erpnext"]
+template_apps = ["builder", "promo_theme", "webshop", "helpdesk", "crm", "erpnext", "payfast_integration", "payments"]
 #web_include_js = ["/assets/promo_theme/js/promo_cards.js"]
 
 
