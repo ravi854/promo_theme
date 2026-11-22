@@ -14,7 +14,8 @@ web_include_js = [
 	"/assets/promo_theme/js/promo_footer.js?v=3",
 	"/assets/promo_theme/js/promo_search.js?v=1",
 	"/assets/promo_theme/js/promo_whatsapp.js?v=13",
-	"/assets/promo_theme/js/promo_chat.js?v=4"
+	"/assets/promo_theme/js/promo_chat.js?v=4",
+	"/assets/promo_theme/js/promo_guest_checkout.js?v=1"
 ]
 
 
@@ -23,7 +24,7 @@ override_whitelisted_methods = {
 }
 
 
-template_apps = ["builder","promo_theme", "webshop", "erpnext"]
+template_apps = ["builder","promo_theme", "webshop", "helpdesk", "crm", "erpnext"]
 #web_include_js = ["/assets/promo_theme/js/promo_cards.js"]
 
 
@@ -90,7 +91,7 @@ template_apps = ["builder","promo_theme", "webshop", "erpnext"]
 # ----------
 
 # application home page (will override Website Settings)
-home_page = "promo_home"
+#home_page = "promo_home"
 
 # website user home page (by Role)
 # role_home_page = {

@@ -1757,3 +1757,12 @@ a.promo-wa-btn {
     font-size: 11px;
   }
 }
+
+/* Guest Express Checkout & Quote Panel on /cart */
+.psa-guest-checkout-box {
+  background: #ffffff;
+  border: 1.5px solid #0f766e;
+  border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 8px 22px rgba(15, 118, 110, 0.08);
+}

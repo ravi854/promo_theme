@@ -671,3 +671,191 @@ def submit_artwork_inquiry():
         frappe.log_error(frappe.get_traceback(), "Artwork Inquiry Email Failed")
 
     return {"status": "success", "lead": lead_name}
+
+
+@frappe.whitelist(allow_guest=True)
+def submit_guest_checkout(
+    full_name,
+    email,
+    phone="",
+    company="",
+    address_line1="",
+    city="",
+    state="",
+    pincode="",
+    notes="",
+):
+    if not full_name or not email:
+        frappe.throw("Please enter your full name and email address.")
+
+    from webshop.webshop.shopping_cart.cart import _get_cart_quotation
+
+    quote_obj = _get_cart_quotation()
+    doc = quote_obj.get("doc") if quote_obj else None
+
+    if not doc or not doc.items:
+        frappe.throw("Your cart is currently empty.")
+
+    enable_checkout = bool(frappe.db.get_single_value("Webshop Settings", "enable_checkout"))
+
+    # Mode A: Direct Online Checkout (Sales Order + Payment Gateway Redirect)
+    if enable_checkout:
+        if not address_line1 or not city:
+            frappe.throw("Please enter your delivery street address and city.")
+
+        customer_label = company.strip() or full_name.strip()
+        customer_name = frappe.db.get_value("Customer", {"customer_name": customer_label}, "name")
+
+        if not customer_name:
+            # Check if a Contact with this email is already linked to a Customer
+            contact_name = frappe.db.get_value("Contact", {"email_id": email}, "name")
+            if contact_name:
+                customer_name = frappe.db.get_value(
+                    "Dynamic Link",
+                    {"parent": contact_name, "parenttype": "Contact", "link_doctype": "Customer"},
+                    "link_name",
+                )
+
+        if not customer_name:
+            customer_group = (
+                frappe.db.get_single_value("Webshop Settings", "default_customer_group")
+                or frappe.db.get_single_value("Selling Settings", "customer_group")
+                or "All Customer Groups"
+            )
+            territory = (
+                frappe.db.get_single_value("Webshop Settings", "territory")
+                or frappe.db.get_single_value("Selling Settings", "territory")
+                or "South Africa"
+            )
+            cust = frappe.get_doc({
+                "doctype": "Customer",
+                "customer_name": customer_label,
+                "customer_type": "Company" if company.strip() else "Individual",
+                "customer_group": customer_group,
+                "territory": territory,
+            })
+            cust.flags.ignore_permissions = True
+            cust.insert()
+            customer_name = cust.name
+
+        # Create or reuse Contact linked to Customer
+        contact_name = frappe.db.get_value("Contact", {"email_id": email}, "name")
+        if not contact_name:
+            parts = full_name.strip().split(" ", 1)
+            contact = frappe.get_doc({
+                "doctype": "Contact",
+                "first_name": parts[0],
+                "last_name": parts[1] if len(parts) > 1 else "",
+                "email_ids": [{"email_id": email, "is_primary": 1}],
+                "phone_nos": [{"phone": phone, "is_primary_mobile_no": 1}] if phone else [],
+                "links": [{"link_doctype": "Customer", "link_name": customer_name}],
+            })
+            contact.flags.ignore_permissions = True
+            contact.insert()
+            contact_name = contact.name
+
+        # Create Shipping Address linked to Customer
+        addr = frappe.get_doc({
+            "doctype": "Address",
+            "address_title": customer_label,
+            "address_type": "Shipping",
+            "address_line1": address_line1.strip(),
+            "city": city.strip(),
+            "state": state.strip(),
+            "pincode": pincode.strip(),
+            "country": frappe.db.get_default("country") or "South Africa",
+            "email_id": email,
+            "phone": phone,
+            "links": [{"link_doctype": "Customer", "link_name": customer_name}],
+        })
+        addr.flags.ignore_permissions = True
+        addr.insert()
+
+        doc.quotation_to = "Customer"
+        doc.party_name = customer_name
+        doc.customer_name = customer_label
+        doc.contact_person = contact_name
+        doc.contact_display = full_name
+        doc.contact_email = email
+        doc.contact_mobile = phone
+        doc.shipping_address_name = addr.name
+        doc.customer_address = addr.name
+        if notes:
+            doc.terms = notes
+
+        doc.flags.ignore_permissions = True
+        doc.save()
+        doc.submit()
+
+        from erpnext.selling.doctype.quotation.quotation import make_sales_order
+
+        so = make_sales_order(doc.name)
+        so.delivery_date = frappe.utils.add_days(frappe.utils.nowdate(), 7)
+        so.flags.ignore_permissions = True
+        so.insert()
+        so.submit()
+
+        if hasattr(frappe.local, "cookie_manager"):
+            frappe.local.cookie_manager.delete_cookie("party_name")
+
+        # Redirect to Payment Request if payment gateway is configured on Webshop Settings
+        redirect_url = f"/orders/{so.name}"
+        payment_gateway_account = frappe.db.get_single_value("Webshop Settings", "payment_gateway_account")
+        if payment_gateway_account and so.grand_total > 0:
+            from erpnext.accounts.doctype.payment_request.payment_request import make_payment_request
+
+            pr = make_payment_request(
+                dt="Sales Order",
+                dn=so.name,
+                recipient_id=email,
+                submit_doc=1,
+                return_doc=1,
+            )
+            if hasattr(pr, "get_payment_url"):
+                redirect_url = pr.get_payment_url()
+
+        frappe.db.commit()
+        return {
+            "status": "success",
+            "mode": "order",
+            "order_id": so.name,
+            "redirect_url": redirect_url,
+        }
+
+    # Mode B: Quote Request Mode (when Enable Checkout is unchecked)
+    lead_name = frappe.db.get_value("Lead", {"email_id": email}, "name")
+    if not lead_name:
+        lead = frappe.get_doc({
+            "doctype": "Lead",
+            "lead_name": full_name,
+            "email_id": email,
+            "mobile_no": phone,
+            "company_name": company,
+            "source": "Website",
+        })
+        lead.flags.ignore_permissions = True
+        lead.insert()
+        lead_name = lead.name
+
+    doc.quotation_to = "Lead"
+    doc.party_name = lead_name
+    doc.customer_name = company or full_name
+    doc.contact_display = full_name
+    doc.contact_email = email
+    doc.contact_mobile = phone
+    if notes:
+        doc.terms = notes
+
+    doc.flags.ignore_permissions = True
+    doc.save()
+    doc.submit()
+    frappe.db.commit()
+
+    if hasattr(frappe.local, "cookie_manager"):
+        frappe.local.cookie_manager.delete_cookie("party_name")
+
+    return {
+        "status": "success",
+        "mode": "quote",
+        "quotation_id": doc.name,
+    }
