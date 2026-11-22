@@ -95,6 +95,9 @@ def get_bulk_pricing_tiers(route=None):
 
 @frappe.whitelist(allow_guest=True)
 def submit_guest_quote(full_name, email, phone="", company="", notes=""):
+    if frappe.session.user == "Guest" and not bool(frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout")):
+        frappe.throw("Guest checkout is currently disabled. Please log in or create an account to continue.")
+
     if not full_name or not email:
         frappe.throw("Please enter your full name and email address.")
 
@@ -550,6 +553,7 @@ def get_store_contact():
     raw_banner = (frappe.db.get_single_value("Website Settings", "banner_html") or "").strip()
     banner_html = "" if frappe.utils.strip_html(raw_banner).strip() == "" else raw_banner
     enable_checkout = int(bool(frappe.db.get_single_value("Webshop Settings", "enable_checkout")))
+    enable_guest_checkout = int(bool(frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout")))
 
     digits = "".join(ch for ch in phone if ch.isdigit())
     wa_number = "27" + digits[1:] if digits.startswith("0") and len(digits) == 10 else digits
@@ -560,6 +564,7 @@ def get_store_contact():
         "wa_number": wa_number,
         "email": email,
         "enable_checkout": enable_checkout,
+        "enable_guest_checkout": enable_guest_checkout,
         "announcement_html": banner_html
         or "<strong>FREE delivery</strong> on orders over R1,500 ex VAT &nbsp;|&nbsp; Fast turnaround &amp; free digital artwork",
     }
@@ -930,3 +935,10 @@ def guest_safe_update_cart(item_code, qty, additional_notes=None, with_items=Fal
         additional_notes=additional_notes,
         with_items=with_items,
     )
+
+
+@frappe.whitelist(allow_guest=True)
+def guest_redirect_on_action():
+    if frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout"):
+        return "/cart"
+    return frappe.db.get_single_value("Webshop Settings", "redirect_on_action") or "/login"

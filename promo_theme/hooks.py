@@ -15,13 +15,14 @@ web_include_js = [
 	"/assets/promo_theme/js/promo_search.js?v=1",
 	"/assets/promo_theme/js/promo_whatsapp.js?v=13",
 	"/assets/promo_theme/js/promo_chat.js?v=4",
-	"/assets/promo_theme/js/promo_guest_checkout.js?v=5"
+	"/assets/promo_theme/js/promo_guest_checkout.js?v=11"
 ]
 
 
 override_whitelisted_methods = {
     "webshop.webshop.api.get_product_filter_data": "promo_theme.overrides.get_product_filter_data",
-	"webshop.webshop.shopping_cart.cart.update_cart": "promo_theme.api.guest_safe_update_cart"
+	"webshop.webshop.shopping_cart.cart.update_cart": "promo_theme.api.guest_safe_update_cart",
+    "webshop.webshop.api.get_guest_redirect_on_action": "promo_theme.api.guest_redirect_on_action"
 }
 
 
