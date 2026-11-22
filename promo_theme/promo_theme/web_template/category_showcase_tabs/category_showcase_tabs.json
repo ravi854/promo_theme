@@ -1,0 +1,51 @@
+{
+  "doctype": "Web Template",
+  "name": "Category Showcase Tabs",
+  "standard": 1,
+  "module": "Promo Theme",
+  "template": "",
+  "fields": [
+    {
+      "fieldname": "title",
+      "fieldtype": "Data",
+      "label": "Section Title",
+      "default": "Shop by Category"
+    },
+    {
+      "fieldname": "subtitle",
+      "fieldtype": "Data",
+      "label": "Subtitle",
+      "default": "Browse our complete range of promotional products"
+    },
+    {
+      "fieldname": "categories",
+      "fieldtype": "Table",
+      "label": "Category Tabs",
+      "fields": [
+        {
+          "fieldname": "label",
+          "fieldtype": "Data",
+          "label": "Tab Label",
+          "reqd": 1
+        },
+        {
+          "fieldname": "item_group",
+          "fieldtype": "Link",
+          "options": "Item Group",
+          "label": "ERPNext Item Group",
+          "reqd": 1
+        },
+        {
+          "fieldname": "category_route",
+          "fieldtype": "Data",
+          "label": "Category Page Route (e.g. /drinkware)"
+        },
+        {
+          "fieldname": "description",
+          "fieldtype": "Small Text",
+          "label": "Category Intro Paragraph"
+        }
+      ]
+    }
+  ]
+}

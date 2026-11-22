@@ -1,0 +1,149 @@
+<section class="py-5 bg-light" id="promo-category-showcase">
+  <div class="container">
+    <!-- Section Header -->
+    <div class="d-flex justify-content-between align-items-end flex-wrap mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">{{ title or "Shop by Category" }}</h2>
+        <p class="text-muted mb-0">{{ subtitle or "Browse our complete range of promotional products" }}</p>
+      </div>
+      <a href="/all-products" class="btn btn-outline-dark rounded-pill px-4 mt-2 mt-md-0">View All Products</a>
+    </div>
+
+    <!-- Horizontal Scrollable Category Pills -->
+    <div class="d-flex gap-2 overflow-auto pb-3 mb-3 promo-category-pills" role="tablist">
+      {% for tab in categories %}
+        <button type="button"
+                class="btn rounded-pill px-4 py-2 text-nowrap promo-tab-btn {{ 'btn-dark active' if loop.first else 'btn-white border bg-white text-dark' }}"
+                data-item-group="{{ tab.item_group }}"
+                data-route="{{ tab.category_route or '/all-products' }}"
+                data-description="{{ tab.description | e }}">
+          {{ tab.label or tab.item_group }}
+        </button>
+      {% endfor %}
+    </div>
+
+    <!-- Dynamic Category Intro Copy -->
+    <div class="bg-white p-4 rounded-3 border mb-4" id="promo-cat-info">
+      <p class="text-muted mb-3" id="promo-cat-desc">
+        {{ categories[0].description if categories else '' }}
+      </p>
+      <a href="{{ categories[0].category_route if categories else '/all-products' }}"
+         id="promo-cat-link"
+         class="fw-semibold text-decoration-none">
+        Browse {{ categories[0].label if categories else 'Products' }} &rarr;
+      </a>
+    </div>
+
+    <!-- Dynamic Product Grid -->
+    <div class="row g-4" id="promo-tab-product-grid">
+      <div class="col-12 text-center py-5 text-muted">Loading products...</div>
+    </div>
+  </div>
+</section>
+
+<script>
+frappe.ready(() => {
+  const $section = $("#promo-category-showcase");
+  if (!$section.length) return;
+
+  const $buttons = $section.find(".promo-tab-btn");
+  const $grid = $("#promo-tab-product-grid");
+  const $desc = $("#promo-cat-desc");
+  const $link = $("#promo-cat-link");
+
+  function renderCards(items) {
+    if (!items || !items.length) {
+      $grid.html(`<div class="col-12 text-center py-4 text-muted">No products found in this category.</div>`);
+      return;
+    }
+
+    // Show top 6 products to match the 3x2 / 6-card homepage showcase
+    const cardsHtml = items.slice(0, 6).map(item => {
+      const stockBadge = item.in_stock
+        ? `<span class="badge-in-stock">In Stock</span>`
+        : "";
+      const brandBadge = item.custom_brandable
+        ? `<span class="badge bg-light text-dark border rounded-pill px-2 py-1 small">Brandable</span>`
+        : "";
+      const price = item.formatted_price || "";
+      const img = item.website_image || "/assets/frappe/images/fallback.png";
+
+      return `
+        <div class="col-sm-6 col-lg-4">
+          <div class="card item-card h-100 p-3">
+            <div class="d-flex gap-2 mb-2" style="min-height: 26px;">
+              ${stockBadge}
+              ${brandBadge}
+            </div>
+            <a href="/${item.route}" class="text-center my-2 d-block">
+              <img src="${img}" alt="${frappe.utils.escape_html(item.web_item_name)}"
+                   class="img-fluid" style="height: 180px; object-fit: contain;">
+            </a>
+            <div class="card-body px-0 pb-0 d-flex flex-column">
+              <small class="text-muted">${frappe.utils.escape_html(item.item_group || "")}</small>
+              <h6 class="card-title fw-bold mt-1 mb-1">
+                <a href="/${item.route}" class="text-dark text-decoration-none">
+                  ${frappe.utils.escape_html(item.web_item_name)}
+                </a>
+              </h6>
+              <p class="text-muted small mb-2">SKU: ${frappe.utils.escape_html(item.item_code || "")}</p>
+              <div class="mt-auto pt-2 border-top d-flex justify-content-between align-items-center">
+                <span class="fw-bold fs-6 product-price">${price}</span>
+                <a href="/${item.route}" class="btn btn-sm btn-outline-dark rounded-pill px-3">View</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    $grid.html(cardsHtml);
+  }
+
+  function loadCategoryProducts(itemGroup) {
+    $grid.html(`<div class="col-12 text-center py-5 text-muted">Loading ${frappe.utils.escape_html(itemGroup)}...</div>`);
+
+    frappe.call({
+      method: "webshop.webshop.api.get_product_filter_data",
+      args: {
+        query_args: {
+          field_filters: { item_group: [itemGroup] },
+          attribute_filters: {},
+          item_group: itemGroup,
+          start: 0,
+          from_filters: false
+        }
+      },
+      callback: function(r) {
+        const items = (r.message && r.message.items) ? r.message.items : [];
+        renderCards(items);
+      }
+    });
+  }
+
+  // Tab Click Handler
+  $buttons.on("click", function() {
+    const $btn = $(this);
+    const group = $btn.data("item-group");
+    const route = $btn.data("route");
+    const description = $btn.data("description");
+    const label = $btn.text().trim();
+
+    // Update active pill styling
+    $buttons.removeClass("btn-dark active").addClass("btn-white border bg-white text-dark");
+    $btn.removeClass("btn-white border bg-white text-dark").addClass("btn-dark active");
+
+    // Update category description & browse link
+    $desc.text(description || "");
+    $link.attr("href", route || "/all-products").html(`Browse ${frappe.utils.escape_html(label)} &rarr;`);
+
+    // Fetch products via AJAX
+    loadCategoryProducts(group);
+  });
+
+  // Load initial active tab on page load
+  if ($buttons.length) {
+    loadCategoryProducts($buttons.first().data("item-group"));
+  }
+});
+</script>

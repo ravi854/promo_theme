@@ -1,0 +1,48 @@
+<div class="row">
+  {% for index in range(1, 13) %}
+    {% set item_name = values['card_' + index|string + '_item'] %}
+    {% if item_name %}
+      {% set item = frappe.get_doc("Website Item", item_name) %}
+      <div class="col-md-4 col-lg-3 mb-4">
+        <div class="card item-card h-100 p-3">
+
+          <!-- Status Badges (In Stock & Brandable) -->
+          <div class="d-flex gap-2 mb-2">
+            {% if item.in_stock %}
+              <span class="badge-in-stock">In Stock</span>
+            {% endif %}
+            {% if item.custom_brandable %}
+              <span class="badge bg-light text-dark border rounded-pill px-2 py-1 small">Brandable</span>
+            {% endif %}
+          </div>
+
+          <!-- Product Image -->
+          <a href="/{{ item.route }}" class="text-center my-2">
+            <img src="{{ item.website_image or '/assets/frappe/images/fallback.png' }}"
+                 alt="{{ item.web_item_name }}"
+                 class="img-fluid" style="max-height: 180px; object-fit: contain;">
+          </a>
+
+          <!-- Category, Title & SKU -->
+          <div class="card-body px-0 pb-0 d-flex flex-column">
+            <small class="text-muted">{{ item.item_group }}</small>
+            <h6 class="card-title fw-bold mt-1 mb-1">
+              <a href="/{{ item.route }}" class="text-dark text-decoration-none">
+                {{ item.web_item_name }}
+              </a>
+            </h6>
+            <p class="text-muted small mb-2">SKU: {{ item.item_code }}</p>
+
+            <!-- Ex-VAT Price -->
+            <div class="mt-auto pt-2 border-top">
+              <span class="fw-bold fs-6 product-price">
+                {{ frappe.utils.fmt_money(item.price_list_rate, currency=item.currency) }}
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>

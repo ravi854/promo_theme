@@ -1,0 +1,312 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="promo-home-wrapper">
+
+  <!-- 1. Hero Banner -->
+  <section class="promo-hero">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-lg-7">
+          <span class="promo-hero-eyebrow">South Africa's Corporate Gifting &amp; Apparel Partner</span>
+          <h1 class="promo-hero-title">Custom Branded Promotional Products &amp; Corporate Clothing</h1>
+          <p class="promo-hero-sub">
+            High-impact branded drinkware, workwear, bags, and tech gifts with fast nationwide delivery and <strong>free digital artwork mockups</strong> on every quote.
+          </p>
+
+          <!-- Live Storefront Search -->
+          <form action="/all-products" method="get" class="promo-hero-search mb-3">
+            <input type="text" name="search" class="form-control" placeholder="Search mugs, golf shirts, pens, backpacks, power banks..." />
+            <button type="submit" class="btn btn-primary font-weight-bold">Search</button>
+          </form>
+
+          <div class="d-flex flex-wrap gap-2" style="gap: 10px;">
+            <a href="/all-products" class="btn btn-light font-weight-bold px-4">Browse Full Catalogue</a>
+            <a href="/cart" class="btn btn-outline-light font-weight-bold px-4">View Quote List</a>
+          </div>
+        </div>
+
+        <div class="col-lg-5 mt-4 mt-lg-0">
+          <div class="promo-hero-card">
+            <h5 class="font-weight-bold mb-3">Why Companies Order With Us</h5>
+            <ul class="promo-hero-checklist mb-0">
+              <li><strong>Free Digital Mockup</strong> before production starts</li>
+              <li><strong>Bulk Quantity Discounts</strong> on 50+, 100+ &amp; 250+ units</li>
+              <li><strong>Free Delivery</strong> on orders over R1,500 ex VAT</li>
+              <li><strong>Screen Print, Embroidery &amp; Laser Engraving</strong></li>
+              <li><strong>Fast Quote Turnaround</strong> from our SA sales team</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Value Proposition Strip -->
+  <section class="promo-trust-strip">
+    <div class="container">
+      <div class="row text-center">
+        <div class="col-6 col-md-3 py-2">
+          <div class="promo-trust-title">Free Artwork</div>
+          <div class="promo-trust-desc">Digital layout on every order</div>
+        </div>
+        <div class="col-6 col-md-3 py-2">
+          <div class="promo-trust-title">Bulk Tier Pricing</div>
+          <div class="promo-trust-desc">Instant volume savings</div>
+        </div>
+        <div class="col-6 col-md-3 py-2">
+          <div class="promo-trust-title">Nationwide Delivery</div>
+          <div class="promo-trust-desc">JHB, CPT, DBN &amp; PTA</div>
+        </div>
+        <div class="col-6 col-md-3 py-2">
+          <div class="promo-trust-title">Custom Branding</div>
+          <div class="promo-trust-desc">Print, embroider &amp; engrave</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Featured Categories Grid -->
+  {% if categories %}
+  <section class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="promo-section-heading mb-0">Shop by Category</h2>
+      <a href="/all-products" class="promo-section-link">View All Categories &rarr;</a>
+    </div>
+    <div class="promo-home-cat-grid">
+      {% for cat in categories %}
+      <a href="{{ cat.route }}" class="promo-home-cat-card">
+        <div class="promo-home-cat-img">
+          {% if cat.image %}
+          <img src="{{ cat.image }}" alt="{{ cat.name }}" loading="lazy" />
+          {% else %}
+          <span class="promo-home-cat-fallback">{{ cat.name[:2] | upper }}</span>
+          {% endif %}
+        </div>
+        <div class="promo-home-cat-name">{{ cat.name }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+
+
+    <!-- 3b. Shop by Industry Section -->
+  <section class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h2 class="promo-section-heading mb-0">Shop by Industry</h2>
+        <p class="text-muted mb-0" style="font-size: 12.5px;">Tailored corporate gifts, PPE, and branded apparel for every South African sector</p>
+      </div>
+      <a href="/all-products" class="promo-section-link">Explore Full Range &rarr;</a>
+    </div>
+
+    <div class="promo-industry-grid">
+      <a href="/all-products?search=safety" class="promo-industry-card">
+        <div class="promo-industry-icon">&#9937;</div>
+        <div>
+          <div class="promo-industry-title">Mining &amp; Construction</div>
+          <div class="promo-industry-desc">Hi-vis workwear, hard hats &amp; rugged flasks</div>
+        </div>
+      </a>
+
+      <a href="/all-products?search=corporate" class="promo-industry-card">
+        <div class="promo-industry-icon">&#128188;</div>
+        <div>
+          <div class="promo-industry-title">Corporate &amp; Finance</div>
+          <div class="promo-industry-desc">Executive pens, notebooks, tech &amp; onboarding kits</div>
+        </div>
+      </a>
+
+      <a href="/all-products?search=hospitality" class="promo-industry-card">
+        <div class="promo-industry-icon">&#9749;</div>
+        <div>
+          <div class="promo-industry-title">Hospitality &amp; Events</div>
+          <div class="promo-industry-desc">Aprons, branded glassware, gazebos &amp; lanyards</div>
+        </div>
+      </a>
+
+      <a href="/all-products?search=health" class="promo-industry-card">
+        <div class="promo-industry-icon">&#9877;</div>
+        <div>
+          <div class="promo-industry-title">Healthcare &amp; Medical</div>
+          <div class="promo-industry-desc">Scrubs, wellness packs, bottles &amp; sanitisers</div>
+        </div>
+      </a>
+
+      <a href="/all-products?search=school" class="promo-industry-card">
+        <div class="promo-industry-icon">&#127891;</div>
+        <div>
+          <div class="promo-industry-title">Education &amp; Universities</div>
+          <div class="promo-industry-desc">Backpacks, stationery, hoodies &amp; orientation packs</div>
+        </div>
+      </a>
+
+      <a href="/all-products?search=sport" class="promo-industry-card">
+        <div class="promo-industry-icon">&#127942;</div>
+        <div>
+          <div class="promo-industry-title">Sports, Golf Days &amp; Clubs</div>
+          <div class="promo-industry-desc">Golf shirts, caps, cooler bags &amp; trophies</div>
+        </div>
+      </a>
+
+      <a href="/all-products?search=bag" class="promo-industry-card">
+        <div class="promo-industry-icon">&#128717;</div>
+        <div>
+          <div class="promo-industry-title">Retail, FMCG &amp; Activations</div>
+          <div class="promo-industry-desc">Tote bags, promo tees, keyrings &amp; giveaways</div>
+        </div>
+      </a>
+
+      <a href="/all-products?search=jacket" class="promo-industry-card">
+        <div class="promo-industry-icon">&#127963;</div>
+        <div>
+          <div class="promo-industry-title">Government &amp; NGOs</div>
+          <div class="promo-industry-desc">Community campaign apparel, caps &amp; stationery</div>
+        </div>
+      </a>
+    </div>
+  </section>
+
+
+
+  <!-- 4. Featured Promotional Products (4-Column Grid) -->
+  {% if featured_products %}
+  <section class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="promo-section-heading mb-0">Popular Brandable Products</h2>
+      <a href="/all-products" class="promo-section-link">Browse All Products &rarr;</a>
+    </div>
+    <div class="promo-home-prod-grid">
+      {% for item in featured_products %}
+      <div class="promo-home-prod-card">
+        <div class="promo-badge-bar">
+          {% if item.new_arrival %}<span class="promo-badge promo-badge-new">New Arrival</span>{% endif %}
+          {% if item.in_stock %}<span class="promo-badge promo-badge-stock">In Stock</span>{% endif %}
+          {% if item.is_brandable %}<span class="promo-badge promo-badge-brandable">Brandable</span>{% endif %}
+        </div>
+        <a href="{{ item.route }}" class="promo-home-prod-img">
+          {% if item.website_image %}
+          <img src="{{ item.website_image }}" alt="{{ item.web_item_name }}" loading="lazy" />
+          {% else %}
+          <span class="text-muted" style="font-size: 12px;">No Image</span>
+          {% endif %}
+        </a>
+        <div class="promo-home-prod-body">
+          <a href="{{ item.route }}" class="promo-home-prod-title">{{ item.web_item_name }}</a>
+          <div class="promo-sku-line">SKU: {{ item.item_code }}</div>
+          {% if item.formatted_price %}
+          <div class="product-price mt-1">
+            {% if item.has_variants %}<span class="promo-from-tag">From </span>{% endif %}
+            {{ item.formatted_price }} <span class="promo-vat-tag">ex VAT</span>
+          </div>
+          {% endif %}
+          <a href="{{ item.route }}" class="btn btn-outline-primary btn-sm btn-block mt-2" style="font-size: 11.5px; font-weight: 600;">
+            {% if item.has_variants %}Select Options{% else %}View &amp; Quote{% endif %}
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+
+     <!-- 4b. Single-Pass Scrollable Brand Logo Strip -->
+  {% if brands %}
+  <section class="promo-brand-strip-section my-5">
+    <div class="container">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="promo-section-heading mb-0">Trusted Promotional Brands</h2>
+        <a href="/shop-by-category#brands" class="promo-section-link">View All Brands &rarr;</a>
+      </div>
+
+      <div class="promo-brand-single-scroll">
+        {% for b in brands %}
+        <a href="/all-products?brand={{ b.name | urlencode }}" class="promo-brand-card" title="Shop {{ b.name }}">
+          {% if b.image %}
+          <img src="{{ b.image }}" alt="{{ b.name }}" loading="lazy" />
+          {% else %}
+          <span class="promo-brand-text">{{ b.name }}</span>
+          {% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- 4c. Branding Techniques Guide -->
+  <section class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h2 class="promo-section-heading mb-0">Custom Branding Techniques Guide</h2>
+        <p class="text-muted mb-0" style="font-size: 12.5px;">Not sure which print finish suits your logo? Explore our in-house branding options</p>
+      </div>
+      <a href="/cart" class="promo-section-link">Request Free Digital Mockup &rarr;</a>
+    </div>
+
+    <div class="promo-tech-grid">
+      <div class="promo-tech-card">
+        <div class="promo-tech-badge">Apparel &amp; Bags</div>
+        <h5 class="promo-tech-title">Screen Printing</h5>
+        <p class="promo-tech-desc">Vibrant, durable ink pressed through mesh stencils. Best for bold spot-colour logos on t-shirts, tote bags, and gazebos.</p>
+        <div class="promo-tech-meta">Ideal for: 25+ units &bull; Up to 6 spot colours</div>
+      </div>
+
+      <div class="promo-tech-card">
+        <div class="promo-tech-badge">Corporate Wear</div>
+        <h5 class="promo-tech-title">Custom Embroidery</h5>
+        <p class="promo-tech-desc">High-stitch-count thread branding for a textured, executive finish that outlasts repeated washing.</p>
+        <div class="promo-tech-meta">Ideal for: Golf shirts, jackets, caps &amp; workwear</div>
+      </div>
+
+      <div class="promo-tech-card">
+        <div class="promo-tech-badge">Metal &amp; Wood</div>
+        <h5 class="promo-tech-title">Laser Engraving</h5>
+        <p class="promo-tech-desc">Precision fibre &amp; CO2 laser etching that permanently reveals the underlying metal or wood grain without fading.</p>
+        <div class="promo-tech-meta">Ideal for: Vacuum flasks, metal pens, keyrings &amp; bamboo</div>
+      </div>
+
+      <div class="promo-tech-card">
+        <div class="promo-tech-badge">Full Colour</div>
+        <h5 class="promo-tech-title">Digital &amp; Sublimation</h5>
+        <p class="promo-tech-desc">Photographic full-colour CMYK prints and heat-infused dyes for gradients, complex logos, and edge-to-edge lanyards.</p>
+        <div class="promo-tech-meta">Ideal for: Ceramic mugs, lanyards, notebooks &amp; tech</div>
+      </div>
+
+      <div class="promo-tech-card">
+        <div class="promo-tech-badge">Curved Items</div>
+        <h5 class="promo-tech-title">Pad Printing</h5>
+        <p class="promo-tech-desc">Flexible silicone pad transfers crisp, fine-detail logos onto curved, cylindrical, or uneven promotional surfaces.</p>
+        <div class="promo-tech-meta">Ideal for: Plastic pens, stress balls, power banks &amp; bottles</div>
+      </div>
+
+      <div class="promo-tech-card">
+        <div class="promo-tech-badge">Executive Gifts</div>
+        <h5 class="promo-tech-title">Debossing &amp; Foiling</h5>
+        <p class="promo-tech-desc">Heated metal die presses your logo deep into leatherette or PU covers—available blind or with metallic gold/silver foil.</p>
+        <div class="promo-tech-meta">Ideal for: A5 notebooks, folders, diaries &amp; wallets</div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- 5. B2B Quote Call-to-Action Banner -->
+  <section class="container my-5">
+    <div class="promo-cta-banner">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h3 class="font-weight-bold mb-1">Need a Bulk Corporate Quote or Custom Branding Advice?</h3>
+          <p class="mb-0">Add items to your Quote List or send us your logo and deadline for a fast, tailored proposal.</p>
+        </div>
+        <div class="col-md-4 text-md-right mt-3 mt-md-0">
+          <a href="/cart" class="btn btn-light font-weight-bold px-4">Open Quote List</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

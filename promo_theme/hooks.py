@@ -5,6 +5,29 @@ app_description = "Custom Promo theme for Print Shop Customer"
 app_email = "info@a1its.net"
 app_license = "mit"
 
+web_include_css = ["/assets/promo_theme/css/promo_store.css?v=48"]
+
+web_include_js = [
+    "/assets/promo_theme/js/promo_store.js?v=32",
+    "/assets/promo_theme/js/variant_swatches.js?v=8",
+    "/assets/promo_theme/js/promo_header.js?v=17",
+	"/assets/promo_theme/js/promo_footer.js?v=3",
+	"/assets/promo_theme/js/promo_search.js?v=1",
+	"/assets/promo_theme/js/promo_whatsapp.js?v=13",
+	"/assets/promo_theme/js/promo_chat.js?v=4"
+]
+
+
+override_whitelisted_methods = {
+    "webshop.webshop.api.get_product_filter_data": "promo_theme.overrides.get_product_filter_data"
+}
+
+
+template_apps = ["builder","promo_theme", "webshop", "erpnext"]
+#web_include_js = ["/assets/promo_theme/js/promo_cards.js"]
+
+
+
 # Apps
 # ------------------
 
@@ -67,7 +90,7 @@ app_license = "mit"
 # ----------
 
 # application home page (will override Website Settings)
-# home_page = "login"
+home_page = "promo_home"
 
 # website user home page (by Role)
 # role_home_page = {

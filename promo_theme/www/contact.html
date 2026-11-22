@@ -1,0 +1,227 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="psa-contact-page">
+
+  <!-- Page Header -->
+  <section class="promo-hero py-4">
+    <div class="container">
+      <span class="promo-hero-eyebrow">Free Digital Artwork Mockups</span>
+      <h1 class="promo-hero-title mb-2" style="font-size: 26px;">Contact Us &amp; Upload Your Artwork</h1>
+      <p class="promo-hero-sub mb-0" style="max-width: 680px;">
+        Send us your logo, product ideas, and target quantities. Our PrintStoreAmaze branding team will prepare a tailored quote and digital layout proof before you commit.
+      </p>
+    </div>
+  </section>
+
+  <!-- Main 2-Column Layout -->
+  <section class="container my-5">
+    <div class="row">
+
+      <!-- Left Column: Artwork & Quote Form -->
+      <div class="col-lg-8 mb-4 mb-lg-0">
+        <div class="psa-contact-card">
+          <h4 class="font-weight-bold mb-1" style="color: #132a2e; font-size: 18px;">Submit Artwork &amp; Quote Request</h4>
+          <p class="text-muted mb-4" style="font-size: 12.5px;">Fields marked with * are required. Vector files (.PDF, .AI, .EPS, .SVG) give the sharpest print results.</p>
+
+          <form id="psa-artwork-form" enctype="multipart/form-data">
+            <div class="row">
+              <div class="col-md-6 form-group">
+                <label class="psa-label">Full Name *</label>
+                <input type="text" name="full_name" class="form-control form-control-sm" placeholder="e.g. Thabo Mokoena" required />
+              </div>
+              <div class="col-md-6 form-group">
+                <label class="psa-label">Company / Organisation</label>
+                <input type="text" name="company" class="form-control form-control-sm" placeholder="e.g. Acme Holdings (Pty) Ltd" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 form-group">
+                <label class="psa-label">Work Email Address *</label>
+                <input type="email" name="email" class="form-control form-control-sm" placeholder="name@company.co.za" required />
+              </div>
+              <div class="col-md-6 form-group">
+                <label class="psa-label">Phone / WhatsApp Number</label>
+                <input type="text" name="phone" class="form-control form-control-sm" placeholder="e.g. 084 027 7327" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 form-group">
+                <label class="psa-label">Products or SKUs Interested In</label>
+                <input type="text" name="product_interest" class="form-control form-control-sm" placeholder="e.g. Golf shirts, ceramic mugs, A5 notebooks" />
+              </div>
+              <div class="col-md-3 form-group">
+                <label class="psa-label">Estimated Qty</label>
+                <input type="text" name="quantity" class="form-control form-control-sm" placeholder="e.g. 100 units" />
+              </div>
+              <div class="col-md-3 form-group">
+                <label class="psa-label">Required Date</label>
+                <input type="date" name="deadline" class="form-control form-control-sm" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="psa-label">Preferred Branding Technique</label>
+              <select name="branding_method" class="form-control form-control-sm">
+                <option value="Not Sure – Advise Me">Not Sure – Please Advise Best Option</option>
+                <option value="Screen Printing">Screen Printing</option>
+                <option value="Custom Embroidery">Custom Embroidery</option>
+                <option value="Laser Engraving">Laser Engraving</option>
+                <option value="Digital / Sublimation Print">Digital / Sublimation Print</option>
+                <option value="Pad Printing">Pad Printing</option>
+                <option value="Debossing / Foiling">Debossing / Foiling</option>
+              </select>
+            </div>
+
+            <!-- Drag & Drop Artwork File Upload Box -->
+            <div class="form-group">
+              <label class="psa-label">Upload Company Logo / Artwork (Max 15MB)</label>
+              <div id="psa-dropzone" class="psa-dropzone" style="position: relative;">
+                <input type="file" id="psa-artwork-input" name="artwork_file" accept=".pdf,.ai,.eps,.svg,.png,.jpg,.jpeg,.zip" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:2;" />
+                <div class="psa-dropzone-icon">&#128193;</div>
+                <div id="psa-file-label" class="psa-dropzone-text">
+                  <strong>Click to choose your logo file</strong> or drag &amp; drop here
+                </div>
+                <div class="psa-dropzone-hint">Accepted formats: PDF, AI, EPS, SVG, PNG, JPG, ZIP</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="psa-label">Branding Placement &amp; Additional Notes</label>
+              <textarea name="notes" rows="3" class="form-control form-control-sm" placeholder="Tell us logo colours (Pantone if known), print positions (e.g. left chest, front), or delivery city..."></textarea>
+            </div>
+
+            <button type="submit" id="psa-artwork-submit" class="btn btn-primary font-weight-bold px-4 py-2">
+              Send Artwork &amp; Request Quote
+            </button>
+          </form>
+
+          <div id="psa-artwork-success" class="alert alert-success mt-3 d-none" style="font-size: 13px;"></div>
+        </div>
+      </div>
+
+      <!-- Right Column: Direct Contact & Artwork Specs -->
+      <div class="col-lg-4">
+        <div class="psa-contact-card mb-3">
+          <h6 class="font-weight-bold mb-2" style="color: #132a2e;">Direct Sales &amp; Quote Desk</h6>
+          <p class="text-muted mb-2" style="font-size: 12px;">Speak directly with our South African account managers:</p>
+          <div style="font-size: 12.5px; line-height: 1.7;">
+            <div><strong>Tel / WhatsApp:</strong> <a href="{{ tel_href }}" style="color: #0f766e; font-weight: 700;">{{ phone }}</a></div>
+            <div><strong>Email:</strong> <a href="mailto:{{ email }}" style="color: #0f766e;">{{ email }}</a></div>
+            <div><strong>Hours:</strong> Mon – Fri, 08:00 – 17:00 SAST</div>
+          </div>
+          <a id="psa-contact-wa-btn"
+             href="https://whatsapp.com{{ wa_number }}"
+             target="_blank" rel="noopener noreferrer"
+             class="btn btn-success btn-sm btn-block font-weight-bold mt-3">
+            Chat on WhatsApp Now
+          </a>
+        </div>
+
+        <div class="psa-contact-card mb-3">
+          <h6 class="font-weight-bold mb-2" style="color: #132a2e;">Artwork File Checklist</h6>
+          <ul class="pl-3 mb-0" style="font-size: 12px; color: #475569; line-height: 1.55;">
+            <li><strong>Vector files</strong> (.AI, .EPS, .PDF, .SVG) with fonts converted to outlines ensure crisp edges at any size.</li>
+            <li><strong>High-resolution raster files</strong> (.PNG / .JPG) should be at least <strong>300 DPI</strong>.</li>
+            <li>Don't have a vector file? Upload what you have—our studio can assist with redraws.</li>
+          </ul>
+        </div>
+
+        <div class="psa-contact-card">
+          <h6 class="font-weight-bold mb-2" style="color: #132a2e;">Nationwide Delivery Hubs</h6>
+          <p class="mb-0" style="font-size: 12px; color: #475569; line-height: 1.5;">
+            <strong>Gauteng:</strong> Roodepoort, Johannesburg &amp; Pretoria<br />
+            <strong>Coastal:</strong> Cape Town, Durban &amp; Gqeberha<br />
+            <span style="color: #0f766e; font-weight: 600;">FREE delivery on orders over R1,500 ex VAT.</span>
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
+
+<script>
+frappe.ready(() => {
+  const dropzone = document.getElementById('psa-dropzone');
+  const fileInput = document.getElementById('psa-artwork-input');
+  const fileLabel = document.getElementById('psa-file-label');
+  const form = document.getElementById('psa-artwork-form');
+  const submitBtn = document.getElementById('psa-artwork-submit');
+  const successBox = document.getElementById('psa-artwork-success');
+  const waBtn = document.getElementById('psa-contact-wa-btn');
+
+  if (waBtn) {
+    const waUrl = new URL(waBtn.href);
+    waUrl.searchParams.set('text', 'Hi PrintStoreAmaze! I would like to send artwork for a quote.');
+    waBtn.href = waUrl.toString();
+  }
+
+  if (!dropzone || !form) return;
+
+  // Native full-area file input handles clicks directly
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files.length > 0) {
+      const fName = fileInput.files[0].name;
+      fileLabel.innerHTML = `<span style="color:#0f766e;font-weight:700;">Selected: ${frappe.utils.escape_html(fName)}</span>`;
+    }
+  });
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      fileInput.files = e.dataTransfer.files;
+      const fName = e.dataTransfer.files[0].name;
+      fileLabel.innerHTML = `<span style="color:#0f766e;font-weight:700;">Selected: ${frappe.utils.escape_html(fName)}</span>`;
+    }
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Uploading & Sending...';
+
+    const formData = new FormData(form);
+    try {
+      const resp = await fetch('/api/method/promo_theme.api.submit_artwork_inquiry', {
+        method: 'POST',
+        headers: { 'X-Frappe-CSRF-Token': frappe.csrf_token },
+        body: formData,
+      });
+const data = await resp.json();
+if (resp.ok && data.message && data.message.status === 'success') {
+form.reset();
+fileLabel.innerHTML = 'Click to choose your logo file or drag & drop here';
+successBox.innerHTML = <strong>Thank you!</strong> Your artwork and quote request has been received (Ref: <strong>${frappe.utils.escape_html(data.message.lead)}</strong>). Our PrintStoreAmaze sales team will send your formal quote and digital mockup shortly.;
+successBox.classList.remove('d-none');
+} else {
+let errMsg = 'Could not submit inquiry. Please try again.';
+if (data._server_messages) {
+try {
+const parsed = JSON.parse(data._server_messages);
+errMsg = JSON.parse(parsed[0]).message || errMsg;
+} catch (ex) {}
+}
+frappe.msgprint(errMsg);
+}
+} catch (err) {
+frappe.msgprint('Network error while uploading artwork. Please try again or email us directly.');
+} finally {
+submitBtn.disabled = false;
+submitBtn.textContent = 'Send Artwork & Request Quote';
+}
+});
+});
+
+{% endblock %}
