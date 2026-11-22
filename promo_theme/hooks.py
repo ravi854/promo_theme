@@ -20,7 +20,8 @@ web_include_js = [
 
 
 override_whitelisted_methods = {
-    "webshop.webshop.api.get_product_filter_data": "promo_theme.overrides.get_product_filter_data"
+    "webshop.webshop.api.get_product_filter_data": "promo_theme.overrides.get_product_filter_data",
+	"webshop.webshop.shopping_cart.cart.update_cart": "promo_theme.api.guest_safe_update_cart"
 }
 
 

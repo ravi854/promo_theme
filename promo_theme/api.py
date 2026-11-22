@@ -859,3 +859,35 @@ def submit_guest_checkout(
         "mode": "quote",
         "quotation_id": doc.name,
     }
+
+
+@frappe.whitelist(allow_guest=True)
+def guest_safe_update_cart(item_code, qty, additional_notes=None, with_items=False):
+    from webshop.webshop.shopping_cart import cart as webshop_cart
+
+    if frappe.session.user == "Guest":
+        frappe.flags.ignore_permissions = True
+        orig_get_settings = webshop_cart.get_shopping_cart_settings
+
+        def _guest_cart_settings():
+            settings = orig_get_settings()
+            settings.enable_checkout = 0
+            return settings
+
+        webshop_cart.get_shopping_cart_settings = _guest_cart_settings
+        try:
+            return webshop_cart.update_cart(
+                item_code=item_code,
+                qty=qty,
+                additional_notes=additional_notes,
+                with_items=with_items,
+            )
+        finally:
+            webshop_cart.get_shopping_cart_settings = orig_get_settings
+
+    return webshop_cart.update_cart(
+        item_code=item_code,
+        qty=qty,
+        additional_notes=additional_notes,
+        with_items=with_items,
+    )
