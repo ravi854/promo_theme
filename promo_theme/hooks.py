@@ -305,3 +305,21 @@ template_apps = ["builder", "promo_theme", "webshop", "helpdesk", "crm", "erpnex
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["name", "in", ["Webshop Settings-enable_guest_checkout"]]
+        ],
+    }
+]
+
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["name", "in", ["Webshop Settings-enable_guest_checkout"]]
+        ],
+    }
+]
