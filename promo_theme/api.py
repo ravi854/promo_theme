@@ -906,11 +906,21 @@ def _process_guest_checkout_as_admin(
             valid_rates = server_rates_res.get("rates") or []
             matched_fee = None
             req_service = (shipping_service or "").strip()
+            req_rate = float(shipping_rate) if (shipping_rate is not None and str(shipping_rate).strip() != "") else None
+            norm = lambda s: " ".join((s or "").replace("—", "-").replace("–", "-").split()).lower()
+            req_norm = norm(req_service)
             for rt in valid_rates:
-                label = f"{rt.get('carrier', '')} — {rt.get('service_name', '')}".strip()
-                if req_service and req_service == label:
-                    matched_fee = float(rt.get("rate_ex_vat") or 0)
+                rt_val = float(rt.get("rate_ex_vat") or 0)
+                label = f"{rt.get('carrier', '')} - {rt.get('service_name', '')}".strip()
+                if req_norm and req_norm == norm(label):
+                    matched_fee = rt_val
                     break
+            if matched_fee is None and req_rate is not None:
+                for rt in valid_rates:
+                    rt_val = float(rt.get("rate_ex_vat") or 0)
+                    if abs(rt_val - req_rate) < 0.05:
+                        matched_fee = rt_val
+                        break
             if matched_fee is not None:
                 chosen_fee = matched_fee
             elif valid_rates:

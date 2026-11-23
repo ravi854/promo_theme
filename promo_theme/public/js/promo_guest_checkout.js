@@ -105,7 +105,7 @@ frappe.ready(function () {
         var taxableSub = exVat + deliveryFee;
         var vat = taxableSub * 0.15;
 
-        var sum = document.getElementById('psa-vat-summary');
+        var sum = document.getElementById('psa-vat-summary'); if (sum) sum.setAttribute('data-ex-vat', String(exVat));
         if (!sum) {
           sum = document.createElement('div');
           sum.id = 'psa-vat-summary';
@@ -214,7 +214,9 @@ frappe.ready(function () {
               state: document.getElementById('gc-state') ? document.getElementById('gc-state').value.trim() : '',
               pincode: document.getElementById('gc-pincode') ? document.getElementById('gc-pincode').value.trim() : '',
               notes: document.getElementById('gc-notes').value.trim(),
-              payment_method: payMethod
+              payment_method: payMethod,
+              shipping_rate: (document.querySelector('input[name="gc-shipping-option"]:checked') && document.querySelector('input[name="gc-shipping-option"]:checked').getAttribute('data-rate')) || '',
+              shipping_service: (document.querySelector('input[name="gc-shipping-option"]:checked') && document.querySelector('input[name="gc-shipping-option"]:checked').getAttribute('data-service')) || ''
             },
             callback: function (res) {
               var out = res.message;
@@ -284,7 +286,7 @@ frappe.ready(function () {
                 return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               };
 
-              var sum = document.getElementById('psa-vat-summary');
+              var sum = document.getElementById('psa-vat-summary'); if (sum) sum.setAttribute('data-ex-vat', String(exVat));
               if (sum) {
                 var deliveryRow = checkoutOn
                   ? '<div class="d-flex justify-content-between"><span>Courier Delivery (ex VAT):</span><b>' + (deliveryFee > 0 ? fmt(deliveryFee) : 'FREE') + '</b></div>'
@@ -355,7 +357,12 @@ frappe.ready(function () {
   };
 
   var updateVatWithSelectedShipping = function () {
-    var exVat = getCartExVat();
+    var sumEl = document.getElementById('psa-vat-summary');
+    var exVat = sumEl ? (parseFloat(sumEl.getAttribute('data-ex-vat') || '0') || 0) : 0;
+    if (!exVat) {
+      var tEl = document.querySelector('.cart-tax-items td.text-right, .cart-tax-items .text-right, .cart-tax-items tr:last-child td:last-child');
+      if (tEl) exVat = parseFloat(tEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+    }
     if (!exVat || exVat <= 0) return;
 
     var selShip = document.querySelector('input[name="gc-shipping-option"]:checked');
@@ -363,7 +370,7 @@ frappe.ready(function () {
     var taxableSub = exVat + shipFee;
     var vat = taxableSub * 0.15;
 
-    var sum = document.getElementById('psa-vat-summary');
+    var sum = document.getElementById('psa-vat-summary'); if (sum) sum.setAttribute('data-ex-vat', String(exVat));
     if (sum) {
       sum.innerHTML =
         '<div class="d-flex justify-content-between"><span>Items Subtotal (ex VAT):</span><b>' + fmt(exVat) + '</b></div>' +
@@ -549,4 +556,36 @@ frappe.ready(function () {
       }
     }
   });
+});
+
+window.psa_delegated_ship_listener = true;
+document.addEventListener('change', function (e) {
+  if (!e.target || e.target.name !== 'gc-shipping-option') return;
+  var sel = e.target;
+  var shipFee = parseFloat(sel.getAttribute('data-rate') || '0') || 0;
+  var sum = document.getElementById('psa-vat-summary');
+  if (!sum) return;
+
+  var exVat = parseFloat(sum.getAttribute('data-ex-vat') || '0') || 0;
+  if (!exVat || isNaN(exVat)) {
+    var totalEl = document.querySelector('.cart-tax-items td.text-right, .cart-tax-items .text-right, .cart-tax-items tr:last-child td:last-child');
+    if (totalEl) {
+      exVat = parseFloat(totalEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+    }
+  }
+  if (!exVat || isNaN(exVat)) return;
+  sum.setAttribute('data-ex-vat', String(exVat));
+
+  var taxableSub = exVat + shipFee;
+  var vat = taxableSub * 0.15;
+  var fmt = function (n) {
+    return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  sum.innerHTML =
+    '<div class="d-flex justify-content-between"><span>Items Subtotal (ex VAT):</span><b>' + fmt(exVat) + '</b></div>' +
+    '<div class="d-flex justify-content-between"><span>Courier Delivery (ex VAT):</span><b>' + (shipFee > 0 ? fmt(shipFee) : 'FREE') + '</b></div>' +
+    '<div class="d-flex justify-content-between"><span>VAT (15%):</span><b>' + fmt(vat) + '</b></div>' +
+    '<div class="d-flex justify-content-between mt-1 pt-1" style="border-top:1px solid #99f6e4;color:#0f766e;font-size:13.5px;">' +
+    '<span><b>Final Total (incl. VAT):</b></span><b>' + fmt(taxableSub + vat) + '</b></div>';
 });
