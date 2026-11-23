@@ -1,0 +1,339 @@
+{% set company_doc = frappe.get_doc("Company", doc.company) if doc.company else None %}
+{% set logo_url = (company_doc.company_logo if company_doc and company_doc.company_logo else frappe.db.get_single_value("Website Settings", "app_logo")) or "" %}
+{% set company_vat = (company_doc.tax_id if company_doc and company_doc.tax_id else "") %}
+{% set customer_vat = doc.tax_id or (frappe.db.get_value("Customer", doc.party_name or doc.customer, "tax_id") if (doc.party_name or doc.customer) else "") %}
+{% set doc_title = "TAX INVOICE" if doc.doctype == "Sales Invoice" else ("SALES ORDER" if doc.doctype == "Sales Order" else "QUOTATION") %}
+
+{% set net_total = doc.net_total or doc.total or 0 %}
+{% set tax_total = doc.total_taxes_and_charges or 0 %}
+{% if tax_total == 0 and net_total > 0 %}
+  {% set est_vat = (net_total * 0.15) %}
+  {% set display_grand = net_total + est_vat %}
+  {% set vat_is_estimated = True %}
+{% else %}
+  {% set est_vat = tax_total %}
+  {% set display_grand = doc.grand_total or (net_total + tax_total) %}
+  {% set vat_is_estimated = False %}
+{% endif %}
+
+<style>
+  .psa-pf-wrap {
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    color: #132a2e;
+    font-size: 11px;
+    line-height: 1.45;
+    padding: 4px 2px;
+  }
+  .psa-pf-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2.5px solid #0f766e;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+  }
+  .psa-pf-logo img {
+    max-height: 54px;
+    max-width: 210px;
+    object-fit: contain;
+    margin-bottom: 6px;
+  }
+  .psa-pf-company-name {
+    font-size: 15px;
+    font-weight: 800;
+    color: #132a2e;
+    margin: 0 0 2px 0;
+  }
+  .psa-pf-muted {
+    color: #475569;
+    font-size: 10px;
+  }
+  .psa-pf-doc-badge {
+    text-align: right;
+  }
+  .psa-pf-doc-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f766e;
+    letter-spacing: 0.5px;
+    margin: 0 0 6px 0;
+  }
+  .psa-pf-meta-table {
+    margin-left: auto;
+    border-collapse: collapse;
+    font-size: 10.5px;
+  }
+  .psa-pf-meta-table td {
+    padding: 2px 0 2px 14px;
+  }
+  .psa-pf-meta-label {
+    color: #64748b;
+    font-weight: 600;
+    text-align: left;
+  }
+  .psa-pf-meta-val {
+    color: #132a2e;
+    font-weight: 700;
+    text-align: right;
+  }
+  .psa-pf-parties {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .psa-pf-box {
+    flex: 1;
+    background-color: #f4f8f7;
+    border: 1px solid #d2dfdc;
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .psa-pf-box-title {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #0f766e;
+    margin-bottom: 5px;
+  }
+  .psa-pf-items {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+  .psa-pf-items th {
+    background-color: #132a2e;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 8px 8px;
+    text-align: left;
+  }
+  .psa-pf-items th.num,
+  .psa-pf-items td.num {
+    text-align: right;
+    white-space: nowrap;
+  }
+  .psa-pf-items td {
+    padding: 8px 8px;
+    border-bottom: 1px solid #dce6e4;
+    vertical-align: top;
+  }
+  .psa-pf-items tr:nth-child(even) td {
+    background-color: #f9fbfb;
+  }
+  .psa-pf-item-name {
+    font-weight: 700;
+    color: #132a2e;
+    font-size: 11px;
+  }
+  .psa-pf-item-sku {
+    font-size: 9.5px;
+    color: #0f766e;
+    font-weight: 600;
+  }
+  .psa-pf-item-desc {
+    font-size: 10px;
+    color: #475569;
+    margin-top: 2px;
+  }
+  .psa-pf-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-top: 8px;
+  }
+  .psa-pf-bank {
+    flex: 1.2;
+    background-color: #f0fdfa;
+    border: 1px solid #99f6e4;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 10px;
+  }
+  .psa-pf-totals {
+    flex: 0.9;
+    border: 1px solid #d2dfdc;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .psa-pf-totals table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .psa-pf-totals td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e2ecea;
+    font-size: 11px;
+  }
+  .psa-pf-totals tr.grand td {
+    background-color: #0f766e;
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 12.5px;
+    border-bottom: none;
+  }
+  .psa-pf-footer {
+    margin-top: 18px;
+    padding-top: 10px;
+    border-top: 1px solid #d2dfdc;
+    font-size: 9.5px;
+    color: #64748b;
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+
+<div class="psa-pf-wrap">
+  <!-- Header -->
+  <div class="psa-pf-header">
+    <div class="psa-pf-logo">
+      {% if logo_url %}
+        <img src="{{ logo_url }}" alt="{{ doc.company }}">
+      {% endif %}
+      <div class="psa-pf-company-name">{{ doc.company or "PrintStoreAmaze" }}</div>
+      <div class="psa-pf-muted">
+        Custom Branded Corporate Gifts &amp; Promotional Clothing<br>
+        Tel: 084 027 7327 &bull; Email: sales@a1its.net<br>
+        {% if company_vat %}<strong>Company VAT Reg No:</strong> {{ company_vat }}{% endif %}
+      </div>
+    </div>
+
+    <div class="psa-pf-doc-badge">
+      <div class="psa-pf-doc-title">{{ doc_title }}</div>
+      <table class="psa-pf-meta-table">
+        <tr>
+          <td class="psa-pf-meta-label">Document No:</td>
+          <td class="psa-pf-meta-val">{{ doc.name }}</td>
+        </tr>
+        <tr>
+          <td class="psa-pf-meta-label">Date:</td>
+          <td class="psa-pf-meta-val">{{ frappe.utils.formatdate(doc.transaction_date or doc.posting_date, "dd MMM yyyy") }}</td>
+        </tr>
+        {% if doc.valid_till %}
+        <tr>
+          <td class="psa-pf-meta-label">Valid Until:</td>
+          <td class="psa-pf-meta-val">{{ frappe.utils.formatdate(doc.valid_till, "dd MMM yyyy") }}</td>
+        </tr>
+        {% endif %}
+        {% if doc.due_date %}
+        <tr>
+          <td class="psa-pf-meta-label">Due Date:</td>
+          <td class="psa-pf-meta-val">{{ frappe.utils.formatdate(doc.due_date, "dd MMM yyyy") }}</td>
+        </tr>
+        {% endif %}
+        {% if doc.delivery_date %}
+        <tr>
+          <td class="psa-pf-meta-label">Est. Delivery:</td>
+          <td class="psa-pf-meta-val">{{ frappe.utils.formatdate(doc.delivery_date, "dd MMM yyyy") }}</td>
+        </tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+
+  <!-- Customer & Delivery Details -->
+  <div class="psa-pf-parties">
+    <div class="psa-pf-box">
+      <div class="psa-pf-box-title">Bill To / Client Details</div>
+      <strong>{{ doc.customer_name or doc.party_name }}</strong><br>
+      {% if doc.contact_display %}Attn: {{ doc.contact_display }}<br>{% endif %}
+      {% if doc.contact_email %}{{ doc.contact_email }}<br>{% endif %}
+      {% if doc.contact_mobile %}{{ doc.contact_mobile }}<br>{% endif %}
+      {% if customer_vat %}<strong>Client VAT No:</strong> {{ customer_vat }}<br>{% endif %}
+      {% if doc.address_display %}{{ doc.address_display }}{% endif %}
+    </div>
+
+    <div class="psa-pf-box">
+      <div class="psa-pf-box-title">Delivery &amp; Branding Instructions</div>
+      {% if doc.shipping_address %}
+        {{ doc.shipping_address }}<br>
+      {% elif doc.address_display %}
+        {{ doc.address_display }}<br>
+      {% else %}
+        Nationwide Courier Delivery (South Africa)<br>
+      {% endif %}
+      {% if doc.po_no %}<strong>Client PO / Ref:</strong> {{ doc.po_no }}<br>{% endif %}
+      <span class="psa-pf-muted">Free digital artwork mockup included prior to bulk branding.</span>
+    </div>
+  </div>
+
+  <!-- Line Items -->
+  <table class="psa-pf-items">
+    <thead>
+      <tr>
+        <th style="width: 6%;">#</th>
+        <th style="width: 48%;">Item &amp; Branding Specification</th>
+        <th class="num" style="width: 10%;">Qty</th>
+        <th class="num" style="width: 18%;">Unit Price (ex VAT)</th>
+        <th class="num" style="width: 18%;">Line Total (ex VAT)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in doc.items %}
+      <tr>
+        <td>{{ item.idx }}</td>
+        <td>
+          <div class="psa-pf-item-name">{{ item.item_name }}</div>
+          <div class="psa-pf-item-sku">SKU: {{ item.item_code }}</div>
+          {% if item.description and item.description != item.item_name %}
+            <div class="psa-pf-item-desc">{{ item.description | striptags | truncate(180) }}</div>
+          {% endif %}
+          {% if item.additional_notes %}
+            <div class="psa-pf-item-desc"><strong>Branding Note:</strong> {{ item.additional_notes }}</div>
+          {% endif %}
+        </td>
+        <td class="num">{{ "{:,.0f}".format(item.qty or 0) }}</td>
+        <td class="num">R {{ "{:,.2f}".format(item.rate or 0) }}</td>
+        <td class="num"><strong>R {{ "{:,.2f}".format(item.amount or 0) }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Banking & ZAR 15% VAT Summary -->
+  <div class="psa-pf-summary-row">
+    <div class="psa-pf-bank">
+      <div class="psa-pf-box-title">EFT Payment &amp; Production Terms</div>
+      <strong>Account Name:</strong> {{ doc.company or "PrintStoreAmaze" }}<br>
+      <strong>Reference:</strong> {{ doc.name }}<br>
+      <div style="margin-top: 5px; color: #334155;">
+        &bull; Production commences upon deposit/payment &amp; signed digital artwork approval.<br>
+        &bull; Free nationwide delivery on orders over R1,500 ex VAT.<br>
+        {% if doc.terms %}&bull; {{ doc.terms | striptags }}{% endif %}
+      </div>
+    </div>
+
+    <div class="psa-pf-totals">
+      <table>
+        <tr>
+          <td>Subtotal (ex VAT)</td>
+          <td style="text-align: right; font-weight: 600;">R {{ "{:,.2f}".format(net_total) }}</td>
+        </tr>
+        {% if doc.discount_amount %}
+        <tr>
+          <td>Discount</td>
+          <td style="text-align: right; color: #0f766e;">- R {{ "{:,.2f}".format(doc.discount_amount) }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td><strong>VAT (15%)</strong></td>
+          <td style="text-align: right; font-weight: 700;">R {{ "{:,.2f}".format(est_vat) }}</td>
+        </tr>
+        <tr class="grand">
+          <td>FINAL TOTAL (incl. VAT)</td>
+          <td style="text-align: right;">R {{ "{:,.2f}".format(display_grand) }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="psa-pf-footer">
+    <span>Thank you for choosing {{ doc.company or "PrintStoreAmaze" }}!</span>
+    <span>All amounts in South African Rand (ZAR) &bull; E&amp;OE</span>
+  </div>
+</div>

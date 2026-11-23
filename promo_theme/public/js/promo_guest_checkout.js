@@ -151,3 +151,87 @@ frappe.ready(function () {
     }
   });
 });
+
+frappe.ready(function () {
+  if (window.location.pathname.replace(/\/+$/, '') !== '/cart') return;
+
+  var renderVatBreakdown = function () {
+    var box = document.getElementById('psa-guest-checkout-box');
+    if (!box) return;
+
+    var totalText = '';
+    document.querySelectorAll('.cart-tax-items td, .cart-tax-items .text-right, .payment-summary td').forEach(function (el) {
+      var m = el.textContent.replace(/,/g, '').match(/R\s*([0-9]+(?:\.[0-9]+)?)/);
+      if (m) totalText = m;
+    });
+
+    var exVat = parseFloat(totalText || '0');
+    if (!exVat || exVat <= 0) return;
+
+    var vat = exVat * 0.15;
+    var inclVat = exVat + vat;
+    var fmt = function (n) {
+      return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    var summary = document.getElementById('psa-vat-summary');
+    if (!summary) {
+      summary = document.createElement('div');
+      summary.id = 'psa-vat-summary';
+      summary.style.cssText = 'background:#f0fdfa;border:1px solid #99f6e4;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px;';
+      var form = document.getElementById('psa-guest-checkout-form');
+      if (form) box.insertBefore(summary, form);
+    }
+
+    summary.innerHTML =
+      '<div class="d-flex justify-content-between"><span>Subtotal (ex VAT):</span><b>' + fmt(exVat) + '</b></div>' +
+      '<div class="d-flex justify-content-between"><span>VAT (15%):</span><b>' + fmt(vat) + '</b></div>' +
+      '<div class="d-flex justify-content-between mt-1 pt-1" style="border-top:1px solid #99f6e4;color:#0f766e;font-size:13.5px;">' +
+      '<span><b>Final Total (incl. VAT):</b></span><b>' + fmt(inclVat) + '</b></div>';
+  };
+
+  setTimeout(renderVatBreakdown, 600);
+  setTimeout(renderVatBreakdown, 1500);
+});
+
+frappe.ready(function () {
+  if (window.location.pathname.replace(/\/+$/, '') !== '/cart') return;
+
+  var renderVatBreakdown = function () {
+    var box = document.getElementById('psa-guest-checkout-box');
+    if (!box) return;
+
+    var totalText = '';
+    document.querySelectorAll('.cart-tax-items td, .cart-tax-items .text-right, .payment-summary td').forEach(function (el) {
+      var m = el.textContent.replace(/,/g, '').match(/R\s*([0-9]+(?:\.[0-9]+)?)/);
+      if (m) totalText = m;
+    });
+
+    var exVat = parseFloat(totalText || '0');
+    if (!exVat || exVat <= 0) return;
+
+    var vat = exVat * 0.15;
+    var inclVat = exVat + vat;
+    var fmt = function (n) {
+      return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    var summary = document.getElementById('psa-vat-summary');
+    if (!summary) {
+      summary = document.createElement('div');
+      summary.id = 'psa-vat-summary';
+      summary.style.cssText = 'background:#f0fdfa;border:1px solid #99f6e4;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px;';
+      var form = document.getElementById('psa-guest-checkout-form');
+      if (form) box.insertBefore(summary, form);
+    }
+
+    summary.innerHTML =
+      '<div class="d-flex justify-content-between"><span>Subtotal (ex VAT):</span><b>' + fmt(exVat) + '</b></div>' +
+      '<div class="d-flex justify-content-between"><span>VAT (15%):</span><b>' + fmt(vat) + '</b></div>' +
+      '<div class="d-flex justify-content-between mt-1 pt-1" style="border-top:1px solid #99f6e4;color:#0f766e;font-size:13.5px;">' +
+      '<span><b>Final Total (incl. VAT):</b></span><b>' + fmt(inclVat) + '</b></div>';
+  };
+
+  setTimeout(renderVatBreakdown, 600);
+  setTimeout(renderVatBreakdown, 1500);
+});

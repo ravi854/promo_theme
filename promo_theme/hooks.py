@@ -307,6 +307,7 @@ template_apps = ["builder", "promo_theme", "webshop", "helpdesk", "crm", "erpnex
 
 
 fixtures = [
+    {"dt": "Print Format", "filters": [["name", "in", ["PrintStoreAmaze Quote", "PrintStoreAmaze Order", "PrintStoreAmaze Tax Invoice"]]]},
     {
         "dt": "Custom Field",
         "filters": [
@@ -316,6 +317,7 @@ fixtures = [
 ]
 
 fixtures = [
+    {"dt": "Print Format", "filters": [["name", "in", ["PrintStoreAmaze Quote", "PrintStoreAmaze Order", "PrintStoreAmaze Tax Invoice"]]]},
     {
         "dt": "Custom Field",
         "filters": [
