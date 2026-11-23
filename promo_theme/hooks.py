@@ -10,7 +10,7 @@ web_include_css = ["/assets/promo_theme/css/promo_store.css?v=49"]
 web_include_js = [
     "/assets/promo_theme/js/promo_store.js?v=32",
     "/assets/promo_theme/js/variant_swatches.js?v=8",
-    "/assets/promo_theme/js/promo_header.js?v=20",
+    "/assets/promo_theme/js/promo_header.js?v=21",
 	"/assets/promo_theme/js/promo_footer.js?v=3",
 	"/assets/promo_theme/js/promo_search.js?v=1",
 	"/assets/promo_theme/js/promo_whatsapp.js?v=14",
@@ -93,7 +93,7 @@ template_apps = ["builder", "promo_theme", "webshop", "helpdesk", "crm", "erpnex
 # ----------
 
 # application home page (will override Website Settings)
-#home_page = "promo_home"
+home_page = "promo_home"
 
 # website user home page (by Role)
 # role_home_page = {

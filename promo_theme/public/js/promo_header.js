@@ -340,3 +340,10 @@ frappe.ready(function () {
     }
   });
 });
+
+frappe.ready(function () {
+  if (window.location.pathname.startsWith('/helpdesk')) return;
+  document.querySelectorAll('nav.navbar .navbar-brand, header.navbar .navbar-brand, .navbar .navbar-brand').forEach(function (a) {
+    a.setAttribute('href', '/');
+  });
+});
