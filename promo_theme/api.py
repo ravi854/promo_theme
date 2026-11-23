@@ -1,5 +1,21 @@
 import urllib.parse
 import frappe
+from functools import wraps
+
+def rate_limit(limit=8, seconds=60):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            ip = getattr(frappe.local, "request_ip", None) or "cli"
+            key = f"psa_rl:{fn.__name__}:{ip}"
+            cache = frappe.cache()
+            cur = int(cache.get_value(key) or 0)
+            if cur >= limit:
+                frappe.throw("Too many requests. Please wait a minute and try again.", frappe.TooManyRequestsError)
+            cache.set_value(key, cur + 1, expires_in_sec=seconds)
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @frappe.whitelist(allow_guest=True)
@@ -489,7 +505,7 @@ def search_promo_products(query=""):
 
 
 @frappe.whitelist(allow_guest=True)
-@frappe.rate_limit(limit=8, seconds=60)
+@rate_limit(limit=8, seconds=60)
 def submit_live_chat_inquiry(name, email, phone="", message="", page_url=""):
     if not name or not email or not message:
         frappe.throw("Please enter your name, email address, and message.")
@@ -714,7 +730,7 @@ def submit_artwork_inquiry():
 
 
 @frappe.whitelist(allow_guest=True)
-@frappe.rate_limit(limit=6, seconds=60)
+@rate_limit(limit=6, seconds=60)
 def submit_guest_checkout(
     full_name,
     email,
@@ -1143,7 +1159,7 @@ def create_chat_lead(full_name="", email="", phone="", message=""):
 
 
 @frappe.whitelist(allow_guest=True)
-@frappe.rate_limit(limit=25, seconds=60)
+@rate_limit(limit=25, seconds=60)
 def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pincode="", cart_total=0):
     cart_total = float(cart_total or 0)
     flat_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 150)
