@@ -13,7 +13,7 @@ web_include_js = [
     "/assets/promo_theme/js/promo_header.js?v=20",
 	"/assets/promo_theme/js/promo_footer.js?v=3",
 	"/assets/promo_theme/js/promo_search.js?v=1",
-	"/assets/promo_theme/js/promo_whatsapp.js?v=13",
+	"/assets/promo_theme/js/promo_whatsapp.js?v=14",
 	"/assets/promo_theme/js/promo_chat.js?v=6",
 	"/assets/promo_theme/js/promo_guest_checkout.js?v=21"
 ]
