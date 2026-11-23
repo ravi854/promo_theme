@@ -564,6 +564,22 @@ def get_store_contact():
     banner_html = "" if frappe.utils.strip_html(raw_banner).strip() == "" else raw_banner
     enable_checkout = int(bool(frappe.db.get_single_value("Webshop Settings", "enable_checkout")))
     enable_guest_checkout = int(bool(frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout")))
+    default_company = (
+        frappe.db.get_single_value("Webshop Settings", "company")
+        or frappe.db.get_single_value("Global Defaults", "default_company")
+        or ""
+    )
+    logo_url = (
+        frappe.db.get_single_value("Website Settings", "app_logo")
+        or frappe.db.get_single_value("Website Settings", "banner_image")
+        or (frappe.db.get_value("Company", default_company, "company_logo") if default_company else "")
+        or ""
+    ).strip()
+    brand_name = (
+        frappe.db.get_single_value("Website Settings", "app_name")
+        or default_company
+        or "PrintStoreAmaze"
+    ).strip()
 
     digits = "".join(ch for ch in phone if ch.isdigit())
     wa_number = "27" + digits[1:] if digits.startswith("0") and len(digits) == 10 else digits
@@ -575,6 +591,8 @@ def get_store_contact():
         "email": email,
         "enable_checkout": enable_checkout,
         "enable_guest_checkout": enable_guest_checkout,
+        "logo_url": logo_url,
+        "brand_name": brand_name,
         "announcement_html": banner_html
         or "<strong>FREE delivery</strong> on orders over R1,500 ex VAT &nbsp;|&nbsp; Fast turnaround &amp; free digital artwork",
     }

@@ -302,3 +302,41 @@ frappe.ready(() => {
   setTimeout(addSupportLink, 400);
   setTimeout(addSupportLink, 1000);
 });
+
+frappe.ready(function () {
+  if (window.location.pathname.startsWith('/helpdesk')) return;
+
+  frappe.call({
+    method: 'promo_theme.api.get_store_contact',
+    callback: function (r) {
+      var info = r.message || {};
+      if (!info.logo_url) return;
+
+      var applyLogo = function () {
+        var logoLink = document.querySelector('nav.navbar .navbar-brand, header.navbar .navbar-brand, .navbar .navbar-brand');
+        if (logoLink && !logoLink.querySelector('img.psa-dynamic-logo')) {
+          logoLink.innerHTML =
+            '<img class="psa-dynamic-logo" src="' +
+            encodeURI(info.logo_url) +
+            '" alt="' +
+            frappe.utils.escape_html(info.brand_name || 'Logo') +
+            '" style="max-height:44px;width:auto;object-fit:contain;display:block;">';
+        }
+
+        var footerLogo = document.querySelector('.promo-footer .promo-footer-logo, .promo-footer .footer-brand');
+        if (footerLogo && !footerLogo.querySelector('img.psa-dynamic-logo')) {
+          footerLogo.innerHTML =
+            '<img class="psa-dynamic-logo" src="' +
+            encodeURI(info.logo_url) +
+            '" alt="' +
+            frappe.utils.escape_html(info.brand_name || 'Logo') +
+            '" style="max-height:40px;width:auto;object-fit:contain;display:block;">';
+        }
+      };
+
+      applyLogo();
+      setTimeout(applyLogo, 400);
+      setTimeout(applyLogo, 1000);
+    }
+  });
+});
