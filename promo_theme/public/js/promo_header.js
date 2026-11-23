@@ -272,7 +272,7 @@ frappe.ready(() => {
 });
 
 frappe.ready(() => {
-  if (window.location.pathname.startsWith('/helpdesk')) {
+  if (window.location.pathname.startsWith('/helpdesk') || window.location.pathname.startsWith('/raven')) {
     document.querySelectorAll('#promo-top-announcement, #promo-main-header, #promo-category-nav, .promo-footer').forEach((el) => {
       el.style.display = 'none';
     });
@@ -304,7 +304,7 @@ frappe.ready(() => {
 });
 
 frappe.ready(function () {
-  if (window.location.pathname.startsWith('/helpdesk')) return;
+  if (window.location.pathname.startsWith('/helpdesk') || window.location.pathname.startsWith('/raven')) return;
 
   frappe.call({
     method: 'promo_theme.api.get_store_contact',
@@ -342,7 +342,7 @@ frappe.ready(function () {
 });
 
 frappe.ready(function () {
-  if (window.location.pathname.startsWith('/helpdesk')) return;
+  if (window.location.pathname.startsWith('/helpdesk') || window.location.pathname.startsWith('/raven')) return;
   document.querySelectorAll('nav.navbar .navbar-brand, header.navbar .navbar-brand, .navbar .navbar-brand').forEach(function (a) {
     a.setAttribute('href', '/');
   });
