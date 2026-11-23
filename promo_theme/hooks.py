@@ -8,7 +8,7 @@ app_license = "mit"
 web_include_css = ["/assets/promo_theme/css/promo_store.css?v=49"]
 
 web_include_js = [
-    "/assets/promo_theme/js/promo_store.js?v=32",
+    "/assets/promo_theme/js/promo_store.js?v=12",
     "/assets/promo_theme/js/variant_swatches.js?v=8",
     "/assets/promo_theme/js/promo_header.js?v=22",
 	"/assets/promo_theme/js/promo_footer.js?v=3",
@@ -311,7 +311,7 @@ fixtures = [
     {
         "dt": "Custom Field",
         "filters": [
-            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over"]]
+            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over", "Website Item-industry"]]
         ],
     }
 ]
@@ -321,7 +321,7 @@ fixtures = [
     {
         "dt": "Custom Field",
         "filters": [
-            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over"]]
+            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over", "Website Item-industry"]]
         ],
     }
 ]

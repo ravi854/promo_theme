@@ -496,3 +496,49 @@ frappe.ready(() => {
 
 
 });
+
+frappe.ready(function () {
+  if (window.location.pathname.replace(/\/+$/, '') !== '/all-products') return;
+  var params = new URLSearchParams(window.location.search);
+  var raw = params.get('field_filters');
+  if (!raw) return;
+  try {
+    var parsed = JSON.parse(raw);
+    var vals = parsed.industry || [];
+    if (!vals.length) return;
+    var applyCheck = function () {
+      vals.forEach(function (v) {
+        var cb = document.querySelector('input.product-filter[data-filter-name="industry"][data-filter-value="' + CSS.escape(v) + '"]');
+        if (cb && !cb.checked) {
+          cb.checked = true;
+          cb.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    };
+    setTimeout(applyCheck, 300);
+    setTimeout(applyCheck, 900);
+  } catch (e) {}
+});
+
+frappe.ready(function () {
+  if (window.location.pathname.replace(/\/+$/, '') !== '/all-products') return;
+  var params = new URLSearchParams(window.location.search);
+  var raw = params.get('field_filters');
+  if (!raw) return;
+  try {
+    var parsed = JSON.parse(raw);
+    var vals = parsed.industry || [];
+    if (!vals.length) return;
+    var applyCheck = function () {
+      vals.forEach(function (v) {
+        var cb = document.querySelector('input.product-filter[data-filter-name="industry"][data-filter-value="' + CSS.escape(v) + '"]');
+        if (cb && !cb.checked) {
+          cb.checked = true;
+          cb.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    };
+    setTimeout(applyCheck, 300);
+    setTimeout(applyCheck, 900);
+  } catch (e) {}
+});
