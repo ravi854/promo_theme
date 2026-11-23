@@ -564,6 +564,7 @@ def get_store_contact():
     banner_html = "" if frappe.utils.strip_html(raw_banner).strip() == "" else raw_banner
     enable_checkout = int(bool(frappe.db.get_single_value("Webshop Settings", "enable_checkout")))
     enable_guest_checkout = int(bool(frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout")))
+    enable_cod = int(bool(frappe.db.get_single_value("Webshop Settings", "enable_cod")))
     default_company = (
         frappe.db.get_single_value("Webshop Settings", "company")
         or frappe.db.get_single_value("Global Defaults", "default_company")
@@ -591,6 +592,7 @@ def get_store_contact():
         "email": email,
         "enable_checkout": enable_checkout,
         "enable_guest_checkout": enable_guest_checkout,
+        "enable_cod": enable_cod,
         "logo_url": logo_url,
         "brand_name": brand_name,
         "announcement_html": banner_html
@@ -717,6 +719,7 @@ def submit_guest_checkout(
     state="",
     pincode="",
     notes="",
+    payment_method="payfast",
 ):
     if not full_name or not email:
         frappe.throw("Please enter your full name and email address.")
@@ -749,14 +752,14 @@ def submit_guest_checkout(
     frappe.set_user("Administrator")
     try:
         return _process_guest_checkout_as_admin(
-            doc, full_name, email, phone, company, address_line1, city, state, pincode, notes
+            doc, full_name, email, phone, company, address_line1, city, state, pincode, notes, payment_method
         )
     finally:
         frappe.set_user(orig_user)
 
 
 def _process_guest_checkout_as_admin(
-    doc, full_name, email, phone, company, address_line1, city, state, pincode, notes
+    doc, full_name, email, phone, company, address_line1, city, state, pincode, notes, payment_method="payfast"
 ):
     enable_checkout = bool(frappe.db.get_single_value("Webshop Settings", "enable_checkout"))
 
@@ -851,8 +854,14 @@ def _process_guest_checkout_as_admin(
 
         from erpnext.selling.doctype.quotation.quotation import make_sales_order
 
+        is_cod = (payment_method or "").strip().lower() == "cod"
+        if is_cod and not bool(frappe.db.get_single_value("Webshop Settings", "enable_cod")):
+            frappe.throw("Cash on Delivery is currently disabled.")
+
         so = make_sales_order(doc.name)
         so.delivery_date = frappe.utils.add_days(frappe.utils.nowdate(), 7)
+        if is_cod:
+            so.terms = ((so.terms + "\n") if so.terms else "") + "Payment Method: Cash on Delivery (COD) — Collect payment upon delivery."
         so.flags.ignore_permissions = True
         so.insert()
         so.submit()
@@ -867,6 +876,16 @@ def _process_guest_checkout_as_admin(
             or frappe.db.get_value("Payment Gateway Account", {"is_default": 1}, "name")
             or "Payfast - ZAR - AD"
         )
+        if is_cod:
+            frappe.db.commit()
+            return {
+                "status": "success",
+                "mode": "cod_order",
+                "order_id": so.name,
+                "grand_total": float(so.grand_total or 0),
+                "redirect_url": f"/orders/{so.name}",
+            }
+
         if payment_gateway_account and so.grand_total > 0:
             from erpnext.accounts.doctype.payment_request.payment_request import make_payment_request
 
