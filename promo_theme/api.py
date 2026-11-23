@@ -114,6 +114,17 @@ def submit_guest_quote(full_name, email, phone="", company="", notes=""):
     if frappe.session.user == "Guest" and not bool(frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout")):
         frappe.throw("Guest checkout is currently disabled. Please log in or create an account to continue.")
 
+    if (website_url or "").strip():
+        frappe.throw("Spam submission detected.")
+
+    if (payment_method or "").strip().lower() == "cod":
+        tok = (challenge_token or "").strip()
+        ans = (challenge_answer or "").strip()
+        expected = frappe.cache().get_value(f"psa_cod_cap:{tok}") if tok else None
+        if not expected or str(expected) != ans:
+            frappe.throw("Verification failed. Please solve the security number check to place a Cash on Delivery order.")
+        frappe.cache().delete_value(f"psa_cod_cap:{tok}")
+
     if not full_name or not email:
         frappe.throw("Please enter your full name and email address.")
 
@@ -744,6 +755,9 @@ def submit_guest_checkout(
     payment_method="payfast",
     shipping_rate=None,
     shipping_service="",
+    challenge_token="",
+    challenge_answer="",
+    website_url="",
 ):
     if not full_name or not email:
         frappe.throw("Please enter your full name and email address.")
@@ -1265,4 +1279,20 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
                 "rate_ex_vat": flat_fee,
             }
         ],
+    }
+
+
+@frappe.whitelist(allow_guest=True)
+@rate_limit(limit=20, seconds=60)
+def get_cod_challenge():
+    import random
+    import uuid
+
+    a = random.randint(2, 12)
+    b = random.randint(1, 9)
+    token = uuid.uuid4().hex
+    frappe.cache().set_value(f"psa_cod_cap:{token}", str(a + b), expires_in_sec=300)
+    return {
+        "token": token,
+        "question": f"What is {a} + {b}?",
     }

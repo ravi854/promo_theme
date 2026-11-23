@@ -454,3 +454,99 @@ frappe.ready(function () {
   setTimeout(mountShippingSelector, 500);
   setTimeout(mountShippingSelector, 1200);
 });
+
+frappe.ready(function () {
+  if (window.location.pathname.replace(/\/+$/, '') !== '/cart') return;
+
+  window._psaCodVerified = null;
+
+  var openCodSecurityModal = function (onVerified) {
+    frappe.call({
+      method: 'promo_theme.api.get_cod_challenge',
+      callback: function (r) {
+        var data = r.message || {};
+        if (!data.token || !data.question) return;
+
+        var old = document.getElementById('psa-cod-captcha-modal');
+        if (old) old.remove();
+
+        var overlay = document.createElement('div');
+        overlay.id = 'psa-cod-captcha-modal';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(19,42,46,0.62);z-index:10060;display:flex;align-items:center;justify-content:center;padding:16px;';
+        overlay.innerHTML =
+          '<div style="background:#ffffff;max-width:380px;width:100%;border-radius:12px;box-shadow:0 20px 45px rgba(0,0,0,0.25);overflow:hidden;border:1.5px solid #0f766e;">' +
+          '<div style="background:#132a2e;color:#ffffff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">' +
+          '<strong style="font-size:14.5px;">Confirm Cash on Delivery Order</strong>' +
+          '<button type="button" id="psa-cap-x" style="background:none;border:none;color:#ffffff;font-size:20px;line-height:1;cursor:pointer;">&times;</button></div>' +
+          '<div style="padding:18px;font-size:13.5px;color:#132a2e;">' +
+          '<p class="mb-2">Please complete this quick security check to confirm your Cash on Delivery order:</p>' +
+          '<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:12px;text-align:center;margin-bottom:12px;">' +
+          '<div style="font-size:17px;font-weight:800;color:#0f766e;margin-bottom:8px;">' + frappe.utils.escape_html(data.question) + '</div>' +
+          '<input type="number" id="psa-cap-input" class="form-control text-center font-weight-bold" placeholder="Enter answer" style="max-width:160px;margin:0 auto;font-size:16px;" autocomplete="off">' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+          '<button type="button" id="psa-cap-cancel" class="btn btn-outline-secondary btn-sm">Cancel</button>' +
+          '<button type="button" id="psa-cap-confirm" class="btn btn-primary btn-sm font-weight-bold">Verify &amp; Place COD Order</button>' +
+          '</div></div></div>';
+
+        document.body.appendChild(overlay);
+        var inp = document.getElementById('psa-cap-input');
+        if (inp) inp.focus();
+
+        var close = function () { overlay.remove(); };
+        document.getElementById('psa-cap-x').addEventListener('click', close);
+        document.getElementById('psa-cap-cancel').addEventListener('click', close);
+
+        var submitCheck = function () {
+          var val = (inp && inp.value || '').trim();
+          if (!val) {
+            if (inp) inp.focus();
+            return;
+          }
+          window._psaCodVerified = { token: data.token, answer: val };
+          close();
+          onVerified();
+        };
+
+        document.getElementById('psa-cap-confirm').addEventListener('click', submitCheck);
+        if (inp) {
+          inp.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') {
+              ev.preventDefault();
+              submitCheck();
+            }
+          });
+        }
+      }
+    });
+  };
+
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form || form.id !== 'psa-guest-checkout-form') return;
+
+    var sel = document.querySelector('input[name="gc-payment-method"]:checked');
+    var isCod = sel && sel.value === 'cod';
+    if (!isCod) return;
+
+    if (!window._psaCodVerified) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      openCodSecurityModal(function () {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+    }
+  }, true);
+
+  $(document).ajaxSend(function (event, jqxhr, settings) {
+    if (settings.url && settings.url.indexOf('submit_guest_checkout') !== -1 && typeof settings.data === 'string') {
+      if (window._psaCodVerified) {
+        settings.data +=
+          '&challenge_token=' + encodeURIComponent(window._psaCodVerified.token) +
+          '&challenge_answer=' + encodeURIComponent(window._psaCodVerified.answer);
+        window._psaCodVerified = null;
+      }
+    }
+  });
+});
