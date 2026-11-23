@@ -489,6 +489,7 @@ def search_promo_products(query=""):
 
 
 @frappe.whitelist(allow_guest=True)
+@frappe.rate_limit(limit=8, seconds=60)
 def submit_live_chat_inquiry(name, email, phone="", message="", page_url=""):
     if not name or not email or not message:
         frappe.throw("Please enter your name, email address, and message.")
@@ -713,6 +714,7 @@ def submit_artwork_inquiry():
 
 
 @frappe.whitelist(allow_guest=True)
+@frappe.rate_limit(limit=6, seconds=60)
 def submit_guest_checkout(
     full_name,
     email,
@@ -861,9 +863,30 @@ def _process_guest_checkout_as_admin(
         default_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 0)
         free_over = float(frappe.db.get_single_value("Webshop Settings", "cod_free_delivery_over") or 0)
         cart_net = float(doc.net_total or doc.total or sum((i.amount or 0) for i in doc.items))
-        chosen_fee = float(shipping_rate) if (shipping_rate is not None and str(shipping_rate).strip() != "") else default_fee
         if free_over > 0 and cart_net >= free_over:
             chosen_fee = 0.0
+        else:
+            server_rates_res = get_webshop_shipping_rates(
+                address_line1=address_line1,
+                city=city,
+                state=state,
+                pincode=pincode,
+                cart_total=cart_net,
+            ) or {}
+            valid_rates = server_rates_res.get("rates") or []
+            matched_fee = None
+            req_service = (shipping_service or "").strip()
+            for rt in valid_rates:
+                label = f"{rt.get('carrier', '')} — {rt.get('service_name', '')}".strip()
+                if req_service and req_service == label:
+                    matched_fee = float(rt.get("rate_ex_vat") or 0)
+                    break
+            if matched_fee is not None:
+                chosen_fee = matched_fee
+            elif valid_rates:
+                chosen_fee = float(valid_rates[0].get("rate_ex_vat") or default_fee)
+            else:
+                chosen_fee = default_fee
         if chosen_fee > 0:
             cod_item_code = "COD-DELIVERY"
             delivery_label = (shipping_service or "").strip() or "Courier Delivery Fee"
@@ -1120,6 +1143,7 @@ def create_chat_lead(full_name="", email="", phone="", message=""):
 
 
 @frappe.whitelist(allow_guest=True)
+@frappe.rate_limit(limit=25, seconds=60)
 def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pincode="", cart_total=0):
     cart_total = float(cart_total or 0)
     flat_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 150)
