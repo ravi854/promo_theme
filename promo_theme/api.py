@@ -853,45 +853,46 @@ def _process_guest_checkout_as_admin(
             doc.terms = notes
 
         is_cod = (payment_method or "").strip().lower() == "cod"
-        if is_cod:
-            if not bool(frappe.db.get_single_value("Webshop Settings", "enable_cod")):
-                frappe.throw("Cash on Delivery is currently disabled.")
-            cod_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 0)
-            free_over = float(frappe.db.get_single_value("Webshop Settings", "cod_free_delivery_over") or 0)
-            cart_net = float(doc.net_total or doc.total or sum((i.amount or 0) for i in doc.items))
-            if cod_fee > 0 and (free_over <= 0 or cart_net < free_over):
-                cod_item_code = "COD-DELIVERY"
-                if not frappe.db.exists("Item", cod_item_code):
-                    item_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "All Item Groups"
-                    cod_item = frappe.get_doc({
-                        "doctype": "Item",
-                        "item_code": cod_item_code,
-                        "item_name": "Cash on Delivery & Courier Fee",
-                        "item_group": item_group,
-                        "stock_uom": "Nos",
-                        "is_stock_item": 0,
-                        "is_sales_item": 1,
-                        "description": "Courier delivery and Cash on Delivery handling fee",
-                    })
-                    cod_item.flags.ignore_permissions = True
-                    cod_item.insert()
-                if not frappe.db.exists("Website Item", {"item_code": cod_item_code}):
-                    wi = frappe.get_doc({
-                        "doctype": "Website Item",
-                        "item_code": cod_item_code,
-                        "web_item_name": "Cash on Delivery & Courier Fee",
-                        "published": 0,
-                    })
-                    wi.flags.ignore_permissions = True
-                    wi.insert()
-                if not any(i.item_code == cod_item_code for i in doc.items):
-                    doc.append("items", {
-                        "item_code": cod_item_code,
-                        "item_name": "Cash on Delivery & Courier Fee",
-                        "qty": 1,
-                        "rate": cod_fee,
-                    })
-                doc.calculate_taxes_and_totals()
+        if is_cod and not bool(frappe.db.get_single_value("Webshop Settings", "enable_cod")):
+            frappe.throw("Cash on Delivery is currently disabled.")
+
+        cod_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 0)
+        free_over = float(frappe.db.get_single_value("Webshop Settings", "cod_free_delivery_over") or 0)
+        cart_net = float(doc.net_total or doc.total or sum((i.amount or 0) for i in doc.items))
+        if cod_fee > 0 and (free_over <= 0 or cart_net < free_over):
+            cod_item_code = "COD-DELIVERY"
+            delivery_label = "Courier Delivery Fee"
+            if not frappe.db.exists("Item", cod_item_code):
+                item_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "All Item Groups"
+                cod_item = frappe.get_doc({
+                    "doctype": "Item",
+                    "item_code": cod_item_code,
+                    "item_name": delivery_label,
+                    "item_group": item_group,
+                    "stock_uom": "Nos",
+                    "is_stock_item": 0,
+                    "is_sales_item": 1,
+                    "description": "Nationwide courier delivery fee (orders under free delivery threshold)",
+                })
+                cod_item.flags.ignore_permissions = True
+                cod_item.insert()
+            if not frappe.db.exists("Website Item", {"item_code": cod_item_code}):
+                wi = frappe.get_doc({
+                    "doctype": "Website Item",
+                    "item_code": cod_item_code,
+                    "web_item_name": delivery_label,
+                    "published": 0,
+                })
+                wi.flags.ignore_permissions = True
+                wi.insert()
+            if not any(i.item_code == cod_item_code for i in doc.items):
+                doc.append("items", {
+                    "item_code": cod_item_code,
+                    "item_name": delivery_label,
+                    "qty": 1,
+                    "rate": cod_fee,
+                })
+            doc.calculate_taxes_and_totals()
 
         if not doc.taxes:
             tax_template = (

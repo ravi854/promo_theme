@@ -45,8 +45,8 @@ frappe.ready(function () {
       if (!window._psaGuestCheckoutEnabled) return;
       var checkoutOn = Boolean(cfg.enable_checkout);
       var codOn = Boolean(cfg.enable_cod);
-      var codFeeCfg = parseFloat(cfg.cod_delivery_charge || '0') || 0;
-      var codFreeOver = parseFloat(cfg.cod_free_delivery_over || '0') || 0;
+      var deliveryFeeCfg = parseFloat(cfg.cod_delivery_charge || '0') || 0;
+      var freeOver = parseFloat(cfg.cod_free_delivery_over || '0') || 0;
 
       if (parseInt(frappe.get_cookie('cart_count') || '0', 10) > 0) {
         $('.shopping-cart').removeClass('hidden').css('display', 'inline-flex');
@@ -54,25 +54,56 @@ frappe.ready(function () {
       }
       if (window.location.pathname.replace(/\/+$/, '') !== '/cart') return;
 
-      var renderVat = function (box) {
+      var fmt = function (n) {
+        return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      var getCartExVat = function () {
         var totalText = '';
         document.querySelectorAll('.cart-tax-items td, .cart-tax-items .text-right, .payment-summary td').forEach(function (el) {
           var m = el.textContent.replace(/,/g, '').match(/R\s*([0-9]+(?:\.[0-9]+)?)/);
-          if (m) totalText = m;
+          if (m) totalText = m[1];
         });
-        var exVat = parseFloat(totalText || '0');
+        return parseFloat(totalText || '0') || 0;
+      };
+
+      var showThresholdModal = function (exVat) {
+        if (deliveryFeeCfg <= 0 || freeOver <= 0 || exVat <= 0 || exVat >= freeOver) return;
+        var oldModal = document.getElementById('psa-cod-threshold-modal');
+        if (oldModal) oldModal.remove();
+
+        var remaining = Math.max(0, freeOver - exVat);
+        var overlay = document.createElement('div');
+        overlay.id = 'psa-cod-threshold-modal';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(19,42,46,0.58);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px;';
+        overlay.innerHTML =
+          '<div style="background:#ffffff;max-width:440px;width:100%;border-radius:12px;box-shadow:0 20px 45px rgba(0,0,0,0.22);overflow:hidden;border:1.5px solid #0f766e;">' +
+          '<div style="background:#132a2e;color:#ffffff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">' +
+          '<strong style="font-size:15px;">Delivery Fee Notice</strong>' +
+          '<button type="button" id="psa-cod-close-x" style="background:none;border:none;color:#ffffff;font-size:20px;line-height:1;cursor:pointer;">&times;</button></div>' +
+          '<div style="padding:18px;font-size:13.5px;line-height:1.5;color:#132a2e;">' +
+          '<p class="mb-2">Your current order subtotal is <b>' + fmt(exVat) + ' ex VAT</b>, which is below our <b>' + fmt(freeOver) + ' ex VAT</b> free delivery threshold.</p>' +
+          '<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:13px;">' +
+          '<div>&bull; Orders below ' + fmt(freeOver) + ' ex VAT incur a <b>' + fmt(deliveryFeeCfg) + ' ex VAT</b> courier delivery fee.</div>' +
+          '<div class="mt-1">&bull; Add <b>' + fmt(remaining) + ' ex VAT</b> more to qualify for <b>FREE Delivery</b>!</div></div>' +
+          '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">' +
+          '<a href="/all-products" class="btn btn-outline-secondary font-weight-bold" style="font-size:13px;">Continue Shopping</a>' +
+          '<button type="button" id="psa-cod-proceed-btn" class="btn btn-primary font-weight-bold" style="font-size:13px;">Proceed (+' + fmt(deliveryFeeCfg) + ' Delivery)</button>' +
+          '</div></div></div>';
+
+        document.body.appendChild(overlay);
+        var closeModal = function () { overlay.remove(); };
+        document.getElementById('psa-cod-close-x').addEventListener('click', closeModal);
+        document.getElementById('psa-cod-proceed-btn').addEventListener('click', closeModal);
+        overlay.addEventListener('click', function (ev) { if (ev.target === overlay) closeModal(); });
+      };
+
+      var renderVat = function (box) {
+        var exVat = getCartExVat();
         if (!exVat || exVat <= 0) return;
-
-        var sel = box.querySelector('input[name="gc-payment-method"]:checked');
-        var isCod = sel && sel.value === 'cod';
-        var deliveryFee = 0;
-        if (isCod && codFeeCfg > 0 && (codFreeOver <= 0 || exVat < codFreeOver)) {
-          deliveryFee = codFeeCfg;
-        }
-
+        var deliveryFee = (checkoutOn && deliveryFeeCfg > 0 && (freeOver <= 0 || exVat < freeOver)) ? deliveryFeeCfg : 0;
         var taxableSub = exVat + deliveryFee;
         var vat = taxableSub * 0.15;
-        var fmt = function (n) { return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
 
         var sum = document.getElementById('psa-vat-summary');
         if (!sum) {
@@ -83,8 +114,8 @@ frappe.ready(function () {
           if (form) box.insertBefore(sum, form);
         }
 
-        var deliveryRow = isCod
-          ? '<div class="d-flex justify-content-between"><span>COD Delivery Fee (ex VAT):</span><b>' + (deliveryFee > 0 ? fmt(deliveryFee) : 'FREE') + '</b></div>'
+        var deliveryRow = checkoutOn
+          ? '<div class="d-flex justify-content-between"><span>Courier Delivery (ex VAT):</span><b>' + (deliveryFee > 0 ? fmt(deliveryFee) : 'FREE') + '</b></div>'
           : '';
 
         sum.innerHTML =
@@ -115,15 +146,15 @@ frappe.ready(function () {
             '<div class="col-4"><input type="text" id="gc-pincode" class="form-control form-control-sm" placeholder="Code"></div></div>'
           : '';
 
-        var codLabel = codFeeCfg > 0
-          ? 'Cash on Delivery (COD) (+R ' + codFeeCfg.toFixed(0) + ' ex VAT' + (codFreeOver > 0 ? ', free over R ' + codFreeOver.toFixed(0) : '') + ')'
-          : 'Cash on Delivery (COD)';
+        var feeNote = (deliveryFeeCfg > 0 && freeOver > 0)
+          ? '<div class="text-muted mb-1" style="font-size:11px;">Orders under ' + fmt(freeOver) + ' ex VAT incur a ' + fmt(deliveryFeeCfg) + ' ex VAT delivery fee.</div>'
+          : '';
 
         var payHtml = checkoutOn
           ? '<div class="mb-2" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;font-size:12px;">' +
-            '<div class="font-weight-bold mb-1" style="color:#132a2e;">Select Payment Option:</div>' +
+            '<div class="font-weight-bold mb-1" style="color:#132a2e;">Select Payment Option:</div>' + feeNote +
             '<label class="d-flex align-items-center mb-1" style="cursor:pointer;gap:6px;"><input type="radio" name="gc-payment-method" value="payfast" checked> <span><b>Pay Online via Payfast</b></span></label>' +
-            (codOn ? '<label class="d-flex align-items-center mb-0" style="cursor:pointer;gap:6px;"><input type="radio" name="gc-payment-method" value="cod"> <span><b>' + codLabel + '</b></span></label>' : '') +
+            (codOn ? '<label class="d-flex align-items-center mb-0" style="cursor:pointer;gap:6px;"><input type="radio" name="gc-payment-method" value="cod"> <span><b>Cash on Delivery (COD)</b></span></label>' : '') +
             '</div>'
           : '';
 
@@ -146,11 +177,20 @@ frappe.ready(function () {
         host.appendChild(box);
         renderVat(box);
 
+        setTimeout(function () {
+          var exVatNow = getCartExVat();
+          if (checkoutOn && exVatNow > 0 && exVatNow < freeOver && !window._psaFeeModalShown) {
+            window._psaFeeModalShown = true;
+            showThresholdModal(exVatNow);
+          }
+        }, 500);
+
         box.querySelectorAll('input[name="gc-payment-method"]').forEach(function (radio) {
           radio.addEventListener('change', function () {
             var btn = document.getElementById('gc-submit-btn');
             if (btn) btn.innerHTML = radio.value === 'cod' ? 'Place Order (Cash on Delivery)' : 'Place Order &amp; Pay Now';
             renderVat(box);
+            showThresholdModal(getCartExVat());
           });
         });
 
@@ -188,93 +228,112 @@ frappe.ready(function () {
                 box.innerHTML = '<div class="alert alert-success mb-0"><b>Quote Request Received!</b> Ref: ' + frappe.utils.escape_html(out.quotation_id || '') + '</div>';
               }
             },
-always: function () {
-if (!document.getElementById('gc-submit-btn')) return;
-btn.disabled = false;
-btn.innerHTML = payMethod === 'cod' ? 'Place Order (Cash on Delivery)' : (checkoutOn ? 'Place Order & Pay Now' : 'Submit Quote Request');
-}
-});
-});
-};
-renderBox();
-setTimeout(renderBox, 400);
-setTimeout(renderBox, 1000);
-}
-});
+            always: function () {
+              if (!document.getElementById('gc-submit-btn')) return;
+              btn.disabled = false;
+              btn.innerHTML = payMethod === 'cod' ? 'Place Order (Cash on Delivery)' : (checkoutOn ? 'Place Order &amp; Pay Now' : 'Submit Quote Request');
+            }
+          });
+        });
+      };
+
+      renderBox();
+      setTimeout(renderBox, 400);
+      setTimeout(renderBox, 1000);
+    }
+  });
 });
 
 frappe.ready(function () {
+  if (frappe.session.user !== 'Guest') return;
   if (window.location.pathname.replace(/\/+$/, '') !== '/cart') return;
 
-  frappe.call({
-    method: 'promo_theme.api.get_store_contact',
-    callback: function (r) {
-      var cfg = r.message || {};
-      var codFee = parseFloat(cfg.cod_delivery_charge || '0') || 0;
-      var freeOver = parseFloat(cfg.cod_free_delivery_over || '0') || 0;
-      if (codFee <= 0 || freeOver <= 0) return;
+  var syncGuestCartQty = function (itemCode, newQty) {
+    frappe.call({
+      type: 'POST',
+      method: 'webshop.webshop.shopping_cart.cart.update_cart',
+      args: { item_code: itemCode, qty: newQty, with_items: 1 },
+      callback: function (r) {
+        if (!r || r.exc || !r.message) return;
+        if (newQty <= 0 || !r.message.items) {
+          window.location.reload();
+          return;
+        }
+        $('.cart-items').html(r.message.items);
+        $('.cart-tax-items').html(r.message.total).css('display', 'block');
+        $('.payment-summary').html(r.message.taxes_and_totals);
 
-      var getCartExVat = function () {
-        var totalText = '';
+        var exVat = 0;
         document.querySelectorAll('.cart-tax-items td, .cart-tax-items .text-right, .payment-summary td').forEach(function (el) {
           var m = el.textContent.replace(/,/g, '').match(/R\s*([0-9]+(?:\.[0-9]+)?)/);
-          if (m) totalText = m[1];
+          if (m && m[1]) exVat = parseFloat(m[1]) || exVat;
         });
-        return parseFloat(totalText || '0') || 0;
-      };
 
-      var showCodThresholdModal = function (exVat) {
-        var oldModal = document.getElementById('psa-cod-threshold-modal');
-        if (oldModal) oldModal.remove();
+        if (exVat > 0) {
+          frappe.call({
+            method: 'promo_theme.api.get_store_contact',
+            callback: function (cfgRes) {
+              var cfg = cfgRes.message || {};
+              var checkoutOn = Boolean(cfg.enable_checkout);
+              var feeCfg = parseFloat(cfg.cod_delivery_charge || '0') || 0;
+              var freeOver = parseFloat(cfg.cod_free_delivery_over || '0') || 0;
+              var deliveryFee = (checkoutOn && feeCfg > 0 && (freeOver <= 0 || exVat < freeOver)) ? feeCfg : 0;
+              var taxableSub = exVat + deliveryFee;
+              var vat = taxableSub * 0.15;
+              var fmt = function (n) {
+                return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              };
 
-        var remaining = Math.max(0, freeOver - exVat);
-        var fmt = function (n) {
-          return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        };
-
-        var overlay = document.createElement('div');
-        overlay.id = 'psa-cod-threshold-modal';
-        overlay.style.cssText =
-          'position:fixed;inset:0;background:rgba(19,42,46,0.58);z-index:10050;' +
-          'display:flex;align-items:center;justify-content:center;padding:16px;';
-
-        overlay.innerHTML =
-          '<div style="background:#ffffff;max-width:440px;width:100%;border-radius:12px;box-shadow:0 20px 45px rgba(0,0,0,0.22);overflow:hidden;border:1.5px solid #0f766e;">' +
-          '  <div style="background:#132a2e;color:#ffffff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">' +
-          '    <strong style="font-size:15px;">Cash on Delivery Fee Notice</strong>' +
-          '    <button type="button" id="psa-cod-close-x" style="background:none;border:none;color:#ffffff;font-size:20px;line-height:1;cursor:pointer;">&times;</button>' +
-          '  </div>' +
-          '  <div style="padding:18px;font-size:13.5px;line-height:1.5;color:#132a2e;">' +
-          '    <p class="mb-2">Your current order subtotal is <b>' + fmt(exVat) + ' ex VAT</b>, which is below our <b>' + fmt(freeOver) + ' ex VAT</b> free delivery threshold.</p>' +
-          '    <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:13px;">' +
-          '      <div>&bull; Proceeding with <b>Cash on Delivery (COD)</b> will add a <b>' + fmt(codFee) + ' ex VAT</b> courier &amp; COD fee.</div>' +
-          '      <div class="mt-1">&bull; Add <b>' + fmt(remaining) + ' ex VAT</b> more to qualify for <b>FREE Delivery</b>!</div>' +
-          '    </div>' +
-          '    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">' +
-          '      <a href="/all-products" class="btn btn-outline-secondary font-weight-bold" style="font-size:13px;">Continue Shopping</a>' +
-          '      <button type="button" id="psa-cod-proceed-btn" class="btn btn-primary font-weight-bold" style="font-size:13px;">Proceed with COD (+' + fmt(codFee) + ')</button>' +
-          '    </div>' +
-          '  </div>' +
-          '</div>';
-
-        document.body.appendChild(overlay);
-
-        var closeModal = function () { overlay.remove(); };
-        document.getElementById('psa-cod-close-x').addEventListener('click', closeModal);
-        document.getElementById('psa-cod-proceed-btn').addEventListener('click', closeModal);
-        overlay.addEventListener('click', function (ev) {
-          if (ev.target === overlay) closeModal();
-        });
-      };
-
-      document.addEventListener('change', function (e) {
-        var radio = e.target;
-        if (!radio || radio.name !== 'gc-payment-method' || radio.value !== 'cod' || !radio.checked) return;
-        var exVat = getCartExVat();
-        if (exVat > 0 && exVat < freeOver) {
-          showCodThresholdModal(exVat);
+              var sum = document.getElementById('psa-vat-summary');
+              if (sum) {
+                var deliveryRow = checkoutOn
+                  ? '<div class="d-flex justify-content-between"><span>Courier Delivery (ex VAT):</span><b>' + (deliveryFee > 0 ? fmt(deliveryFee) : 'FREE') + '</b></div>'
+                  : '';
+                sum.innerHTML =
+                  '<div class="d-flex justify-content-between"><span>Items Subtotal (ex VAT):</span><b>' + fmt(exVat) + '</b></div>' +
+                  deliveryRow +
+                  '<div class="d-flex justify-content-between"><span>VAT (15%):</span><b>' + fmt(vat) + '</b></div>' +
+                  '<div class="d-flex justify-content-between mt-1 pt-1" style="border-top:1px solid #99f6e4;color:#0f766e;font-size:13.5px;">' +
+                  '<span><b>Final Total (incl. VAT):</b></span><b>' + fmt(taxableSub + vat) + '</b></div>';
+              }
+            }
+          });
         }
-      });
+      }
+    });
+  };
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.cart-btn, .remove-cart-item');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    var row = btn.closest('tr, .cart-item-wrapper');
+    var input = row ? row.querySelector('input.cart-qty') : null;
+    var itemCode = btn.getAttribute('data-item-code') || (input && input.getAttribute('data-item-code'));
+    if (!itemCode) return;
+
+    if (btn.classList.contains('remove-cart-item')) {
+      syncGuestCartQty(itemCode, 0);
+      return;
     }
-  });
+
+    var cur = input ? (parseFloat(input.value) || 1) : 1;
+    var dir = btn.getAttribute('data-dir');
+    var next = dir === 'up' ? cur + 1 : Math.max(0, cur - 1);
+    if (input) input.value = next;
+    syncGuestCartQty(itemCode, next);
+  }, true);
+
+  document.addEventListener('change', function (e) {
+    var input = e.target;
+    if (!input || !input.classList || !input.classList.contains('cart-qty')) return;
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    var itemCode = input.getAttribute('data-item-code');
+    var next = Math.max(0, parseFloat(input.value) || 0);
+    if (itemCode) syncGuestCartQty(itemCode, next);
+  }, true);
 });
