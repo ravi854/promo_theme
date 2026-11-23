@@ -150,3 +150,52 @@ frappe.ready(() => {
 
   initPromoChat();
 });
+
+frappe.ready(() => {
+  if (window.location.pathname.startsWith('/helpdesk')) return;
+
+  const injectTicketShortcut = () => {
+    const panel = document.querySelector('#psa-chat-panel, .psa-chat-panel');
+    if (!panel || panel.querySelector('#psa-chat-ticket-bar')) return;
+
+    const bar = document.createElement('div');
+    bar.id = 'psa-chat-ticket-bar';
+    bar.style.cssText = 'padding:6px 12px;background:#f0fdfa;border-bottom:1px solid #ccfbf1;font-size:11.5px;display:flex;justify-content:space-between;align-items:center;';
+    bar.innerHTML = '<span style="color:#132a2e;">Need order or artwork help?</span><a href="/helpdesk/tickets/new" style="color:#0f766e;font-weight:700;text-decoration:underline;">Open Ticket &rarr;</a>';
+
+    const body = panel.querySelector('.psa-chat-body, .psa-chat-messages') || panel.children;
+    if (body && body.parentNode) {
+      body.parentNode.insertBefore(bar, body);
+    }
+  };
+
+  injectTicketShortcut();
+  setTimeout(injectTicketShortcut, 600);
+});
+
+frappe.ready(function () {
+  if (window.location.pathname.startsWith('/helpdesk')) return;
+
+  var addTicketBanner = function () {
+    var box = document.querySelector('#promo-chat-window, #promo-chat-box, .promo-chat-window, #psa-chat-panel, .psa-chat-panel');
+    if (!box || box.querySelector('#psa-chat-ticket-bar')) return;
+
+    var bar = document.createElement('div');
+    bar.id = 'psa-chat-ticket-bar';
+    bar.style.cssText = 'padding:6px 12px;background:#f0fdfa;border-bottom:1px solid #ccfbf1;font-size:11px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;';
+    bar.innerHTML = '<span style="color:#132a2e;">Order or artwork query?</span><a href="/helpdesk/tickets/new" style="color:#0f766e;font-weight:700;text-decoration:underline;">Open Ticket &rarr;</a>';
+
+    var header = box.querySelector('.promo-chat-header, .psa-chat-header, [class*="chat-header"]');
+    if (header && header.nextSibling) {
+      box.insertBefore(bar, header.nextSibling);
+    } else if (box.children.length > 1) {
+      box.insertBefore(bar, box.children);
+    } else {
+      box.prepend(bar);
+    }
+  };
+
+  addTicketBanner();
+  var obs = new MutationObserver(addTicketBanner);
+  obs.observe(document.body, { childList: true, subtree: true });
+});

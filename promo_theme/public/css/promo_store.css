@@ -1766,3 +1766,38 @@ a.promo-wa-btn {
   padding: 16px 18px;
   box-shadow: 0 8px 22px rgba(15, 118, 110, 0.08);
 }
+
+/* Support / My Tickets Link in Category Bar */
+.psa-nav-support-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #132a2e !important;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  text-decoration: none !important;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.psa-nav-support-btn:hover {
+  background-color: #f0fdfa;
+  color: #0f766e !important;
+}
+
+@media (max-width: 991px) {
+  .psa-nav-support-btn {
+    display: none;
+  }
+}
+
+/* Compact Support / My Tickets Link */
+.psa-nav-support-btn {
+  font-size: 11px !important;
+  padding: 4px 8px !important;
+  gap: 4px !important;
+}

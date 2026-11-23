@@ -270,3 +270,35 @@ frappe.ready(() => {
     },
   });
 });
+
+frappe.ready(() => {
+  if (window.location.pathname.startsWith('/helpdesk')) {
+    document.querySelectorAll('#promo-top-announcement, #promo-main-header, #promo-category-nav, .promo-footer').forEach((el) => {
+      el.style.display = 'none';
+    });
+    return;
+  }
+
+  const addSupportLink = () => {
+    const navInner = document.querySelector('#promo-category-nav .promo-nav-inner');
+    if (!navInner || navInner.querySelector('#psa-nav-support-btn')) return;
+
+    const artworkBtn = navInner.querySelector('#psa-nav-artwork-btn');
+    const supportLink = document.createElement('a');
+    supportLink.id = 'psa-nav-support-btn';
+    supportLink.href = '/helpdesk';
+    supportLink.className = 'psa-nav-support-btn';
+    supportLink.innerHTML = '&#127911; Support / My Tickets';
+
+    if (artworkBtn) {
+      artworkBtn.style.marginLeft = '8px';
+      navInner.insertBefore(supportLink, artworkBtn);
+    } else {
+      navInner.appendChild(supportLink);
+    }
+  };
+
+  addSupportLink();
+  setTimeout(addSupportLink, 400);
+  setTimeout(addSupportLink, 1000);
+});
