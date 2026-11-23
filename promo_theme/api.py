@@ -724,6 +724,8 @@ def submit_guest_checkout(
     pincode="",
     notes="",
     payment_method="payfast",
+    shipping_rate=None,
+    shipping_service="",
 ):
     if not full_name or not email:
         frappe.throw("Please enter your full name and email address.")
@@ -756,14 +758,14 @@ def submit_guest_checkout(
     frappe.set_user("Administrator")
     try:
         return _process_guest_checkout_as_admin(
-            doc, full_name, email, phone, company, address_line1, city, state, pincode, notes, payment_method
+            doc, full_name, email, phone, company, address_line1, city, state, pincode, notes, payment_method, shipping_rate, shipping_service
         )
     finally:
         frappe.set_user(orig_user)
 
 
 def _process_guest_checkout_as_admin(
-    doc, full_name, email, phone, company, address_line1, city, state, pincode, notes, payment_method="payfast"
+    doc, full_name, email, phone, company, address_line1, city, state, pincode, notes, payment_method="payfast", shipping_rate=None, shipping_service=""
 ):
     enable_checkout = bool(frappe.db.get_single_value("Webshop Settings", "enable_checkout"))
 
@@ -856,12 +858,15 @@ def _process_guest_checkout_as_admin(
         if is_cod and not bool(frappe.db.get_single_value("Webshop Settings", "enable_cod")):
             frappe.throw("Cash on Delivery is currently disabled.")
 
-        cod_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 0)
+        default_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 0)
         free_over = float(frappe.db.get_single_value("Webshop Settings", "cod_free_delivery_over") or 0)
         cart_net = float(doc.net_total or doc.total or sum((i.amount or 0) for i in doc.items))
-        if cod_fee > 0 and (free_over <= 0 or cart_net < free_over):
+        chosen_fee = float(shipping_rate) if (shipping_rate is not None and str(shipping_rate).strip() != "") else default_fee
+        if free_over > 0 and cart_net >= free_over:
+            chosen_fee = 0.0
+        if chosen_fee > 0:
             cod_item_code = "COD-DELIVERY"
-            delivery_label = "Courier Delivery Fee"
+            delivery_label = (shipping_service or "").strip() or "Courier Delivery Fee"
             if not frappe.db.exists("Item", cod_item_code):
                 item_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "All Item Groups"
                 cod_item = frappe.get_doc({
@@ -890,7 +895,7 @@ def _process_guest_checkout_as_admin(
                     "item_code": cod_item_code,
                     "item_name": delivery_label,
                     "qty": 1,
-                    "rate": cod_fee,
+                    "rate": chosen_fee,
                 })
             doc.calculate_taxes_and_totals()
 
@@ -1112,3 +1117,112 @@ def create_chat_lead(full_name="", email="", phone="", message=""):
 
     frappe.db.commit()
     return {"status": "success", "lead": lead_name}
+
+
+@frappe.whitelist(allow_guest=True)
+def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pincode="", cart_total=0):
+    cart_total = float(cart_total or 0)
+    flat_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 150)
+    free_over = float(frappe.db.get_single_value("Webshop Settings", "cod_free_delivery_over") or 1500)
+
+    if free_over > 0 and cart_total >= free_over:
+        return {
+            "source": "free_threshold",
+            "rates": [
+                {
+                    "carrier": "PrintStoreAmaze Courier",
+                    "service_name": "FREE Nationwide Delivery (Order over threshold)",
+                    "rate_ex_vat": 0.0,
+                }
+            ],
+        }
+
+    bobgo_enabled = bool(frappe.db.exists("DocType", "BobGo") and frappe.db.get_single_value("BobGo", "enabled"))
+    if bobgo_enabled and (city or pincode):
+        orig_user = frappe.session.user
+        frappe.set_user("Administrator")
+        try:
+            from bobgoshipping.bobgoshipping.doctype.bobgo.bobgo import get_bobgo_utils
+            from bobgoshipping.bobgoshipping.utils import get_address
+
+            default_company = (
+                frappe.db.get_single_value("Webshop Settings", "company")
+                or frappe.db.get_single_value("Global Defaults", "default_company")
+            )
+            pickup_addr_name = frappe.db.get_value(
+                "Dynamic Link",
+                {"link_doctype": "Company", "link_name": default_company, "parenttype": "Address"},
+                "parent",
+            )
+            if pickup_addr_name:
+                pickup_address = get_address(pickup_addr_name)
+            else:
+                pickup_address = frappe._dict({
+                    "address_line1": "Witpoortjie",
+                    "city": "Roodepoort",
+                    "state": "Gauteng",
+                    "pincode": "1724",
+                    "country": "South Africa",
+                })
+
+            delivery_address = frappe._dict({
+                "address_line1": address_line1 or city or "Delivery Address",
+                "city": city or "Johannesburg",
+                "state": state or "Gauteng",
+                "pincode": pincode or "2000",
+                "country": "South Africa",
+            })
+
+            contact_stub = frappe._dict({
+                "first_name": "Store",
+                "last_name": "Customer",
+                "email_id": frappe.db.get_single_value("Contact Us Settings", "email_id") or "sales@a1its.net",
+                "phone": "0840277327",
+                "mobile_no": "0840277327",
+            })
+
+            parcels = [{"length": 35, "width": 25, "height": 20, "weight": 2.0, "count": 1}]
+            bobgo = get_bobgo_utils()
+            raw_rates = (
+                bobgo.get_available_services(
+                    pickup_address=pickup_address,
+                    delivery_address=delivery_address,
+                    parcels=parcels,
+                    pickup_contact=contact_stub,
+                    delivery_contact=contact_stub,
+                    value_of_goods=cart_total or 500,
+                )
+                or []
+            )
+
+            live_rates = []
+            for item in raw_rates:
+                if "total_price" not in item:
+                    continue
+                price_val = float(item.get("total_price") or 0)
+                # Convert to ex-VAT if Bob Go returns VAT-inclusive rate
+                rate_ex_vat = round(price_val / 1.15, 2)
+                live_rates.append({
+                    "carrier": item.get("carrier") or "Courier",
+                    "service_name": item.get("service_name") or item.get("service_level_name") or "Standard Courier",
+                    "rate_ex_vat": rate_ex_vat,
+                })
+
+            live_rates.sort(key=lambda x: x["rate_ex_vat"])
+            if live_rates:
+                return {"source": "bobgo", "rates": live_rates}
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), "Webshop BobGo Rate Lookup Failed")
+        finally:
+            frappe.set_user(orig_user)
+
+    return {
+        "source": "flat_rate",
+        "rates": [
+            {
+                "carrier": "Standard Courier",
+                "service_name": "Nationwide Door-to-Door Courier",
+                "rate_ex_vat": flat_fee,
+            }
+        ],
+    }

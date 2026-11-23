@@ -337,3 +337,120 @@ frappe.ready(function () {
     if (itemCode) syncGuestCartQty(itemCode, next);
   }, true);
 });
+
+frappe.ready(function () {
+  if (window.location.pathname.replace(/\/+$/, '') !== '/cart') return;
+
+  var fmt = function (n) {
+    return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  var getCartExVat = function () {
+    var totalText = '';
+    document.querySelectorAll('.cart-tax-items td, .cart-tax-items .text-right, .payment-summary td').forEach(function (el) {
+      var m = el.textContent.replace(/,/g, '').match(/R\s*([0-9]+(?:\.[0-9]+)?)/);
+      if (m) totalText = m;
+    });
+    return parseFloat(totalText || '0') || 0;
+  };
+
+  var updateVatWithSelectedShipping = function () {
+    var exVat = getCartExVat();
+    if (!exVat || exVat <= 0) return;
+
+    var selShip = document.querySelector('input[name="gc-shipping-option"]:checked');
+    var shipFee = selShip ? (parseFloat(selShip.getAttribute('data-rate') || '0') || 0) : 0;
+    var taxableSub = exVat + shipFee;
+    var vat = taxableSub * 0.15;
+
+    var sum = document.getElementById('psa-vat-summary');
+    if (sum) {
+      sum.innerHTML =
+        '<div class="d-flex justify-content-between"><span>Items Subtotal (ex VAT):</span><b>' + fmt(exVat) + '</b></div>' +
+        '<div class="d-flex justify-content-between"><span>Courier Delivery (ex VAT):</span><b>' + (shipFee > 0 ? fmt(shipFee) : 'FREE') + '</b></div>' +
+        '<div class="d-flex justify-content-between"><span>VAT (15%):</span><b>' + fmt(vat) + '</b></div>' +
+        '<div class="d-flex justify-content-between mt-1 pt-1" style="border-top:1px solid #99f6e4;color:#0f766e;font-size:13.5px;">' +
+        '<span><b>Final Total (incl. VAT):</b></span><b>' + fmt(taxableSub + vat) + '</b></div>';
+    }
+  };
+
+  var fetchLiveRates = function () {
+    var shipBox = document.getElementById('psa-shipping-rates-box');
+    if (!shipBox) return;
+    var city = (document.getElementById('gc-city') && document.getElementById('gc-city').value.trim()) || '';
+    var state = (document.getElementById('gc-state') && document.getElementById('gc-state').value.trim()) || 'Gauteng';
+    var pincode = (document.getElementById('gc-pincode') && document.getElementById('gc-pincode').value.trim()) || '';
+    var addr1 = (document.getElementById('gc-address1') && document.getElementById('gc-address1').value.trim()) || '';
+
+    shipBox.innerHTML = '<div class="text-muted" style="font-size:11.5px;">Fetching South African courier rates...</div>';
+
+    frappe.call({
+      method: 'promo_theme.api.get_webshop_shipping_rates',
+      args: { address_line1: addr1, city: city, state: state, pincode: pincode, cart_total: getCartExVat() },
+      callback: function (r) {
+        var data = r.message || {};
+        var rates = data.rates || [];
+        if (!rates.length) return;
+
+        var html = '<div class="font-weight-bold mb-1" style="color:#132a2e;">Select Courier Delivery Option:</div>';
+        rates.forEach(function (rt, idx) {
+          var label = rt.carrier + ' — ' + rt.service_name;
+          var priceTxt = rt.rate_ex_vat > 0 ? (fmt(rt.rate_ex_vat) + ' ex VAT') : 'FREE';
+          html +=
+            '<label class="d-flex justify-content-between align-items-center mb-1" style="cursor:pointer;gap:6px;">' +
+            '<span><input type="radio" name="gc-shipping-option" value="' + idx + '" data-rate="' + rt.rate_ex_vat + '" data-service="' + frappe.utils.escape_html(label) + '"' + (idx === 0 ? ' checked' : '') + '> ' +
+            frappe.utils.escape_html(label) + '</span>' +
+            '<b>' + priceTxt + '</b></label>';
+        });
+        shipBox.innerHTML = html;
+
+        shipBox.querySelectorAll('input[name="gc-shipping-option"]').forEach(function (rad) {
+          rad.addEventListener('change', updateVatWithSelectedShipping);
+        });
+        updateVatWithSelectedShipping();
+      }
+    });
+  };
+
+  var mountShippingSelector = function () {
+    var form = document.getElementById('psa-guest-checkout-form');
+    var pinInput = document.getElementById('gc-pincode');
+    if (!form || !pinInput || document.getElementById('psa-shipping-rates-box')) return;
+
+    var wrap = document.createElement('div');
+    wrap.id = 'psa-shipping-rates-box';
+    wrap.className = 'mb-2';
+    wrap.style.cssText = 'background:#f0fdfa;border:1px solid #99f6e4;border-radius:6px;padding:8px 10px;font-size:12px;';
+    wrap.innerHTML =
+      '<div class="d-flex justify-content-between align-items-center">' +
+      '<span style="color:#132a2e;">Enter City &amp; Postal Code for courier rates</span>' +
+      '<button type="button" id="psa-calc-ship-btn" class="btn btn-xs btn-outline-primary font-weight-bold">Get Rates</button></div>';
+
+    var notesField = document.getElementById('gc-notes');
+    if (notesField && notesField.parentNode) {
+      form.insertBefore(wrap, notesField.parentNode);
+    }
+
+    document.getElementById('psa-calc-ship-btn').addEventListener('click', fetchLiveRates);
+    ['gc-city', 'gc-state', 'gc-pincode'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('change', fetchLiveRates);
+    });
+  };
+
+  // Include selected shipping_rate & shipping_service in checkout submission
+  $(document).ajaxSend(function (event, jqxhr, settings) {
+    if (settings.url && settings.url.indexOf('submit_guest_checkout') !== -1 && typeof settings.data === 'string') {
+      var selShip = document.querySelector('input[name="gc-shipping-option"]:checked');
+      if (selShip) {
+        var extra =
+          '&shipping_rate=' + encodeURIComponent(selShip.getAttribute('data-rate') || '0') +
+          '&shipping_service=' + encodeURIComponent(selShip.getAttribute('data-service') || '');
+        settings.data += extra;
+      }
+    }
+  });
+
+  setTimeout(mountShippingSelector, 500);
+  setTimeout(mountShippingSelector, 1200);
+});
