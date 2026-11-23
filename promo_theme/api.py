@@ -493,58 +493,68 @@ def submit_live_chat_inquiry(name, email, phone="", message="", page_url=""):
     if not name or not email or not message:
         frappe.throw("Please enter your name, email address, and message.")
 
-    lead_name = frappe.db.get_value("Lead", {"email_id": email}, "name")
-    if not lead_name:
-        lead = frappe.get_doc({
-            "doctype": "Lead",
-            "lead_name": name,
-            "email_id": email,
-            "mobile_no": phone,
-            "source": "Website",
-        })
-        lead.flags.ignore_permissions = True
-        lead.insert()
-        lead_name = lead.name
-
-    lead_doc = frappe.get_doc("Lead", lead_name)
-    lead_doc.add_comment(
-        "Comment",
-        f"<strong>Website Live Chat Inquiry</strong><br>"
-        f"<strong>Page:</strong> {frappe.utils.escape_html(page_url or '-')}<br>"
-        f"<strong>Phone:</strong> {frappe.utils.escape_html(phone or '-')}<br>"
-        f"<strong>Message:</strong> {frappe.utils.escape_html(message)}",
-    )
-
-    sales_email = (
-        frappe.db.get_value("Email Account", {"default_outgoing": 1, "enable_outgoing": 1}, "email_id")
-        or "sales@a1its.net"
-    )
-    lead_url = frappe.utils.get_url_to_form("Lead", lead_name)
-
+    orig_user = frappe.session.user
+    frappe.set_user("Administrator")
     try:
-        frappe.sendmail(
-            recipients=[sales_email],
-            sender=sales_email,
-            subject=f"New Website Live Chat Message from {name}",
-            message=f"""
-            <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;">
-              <h2 style="color:#0f766e;margin-bottom:8px;">New Website Live Chat Inquiry</h2>
-              <p><strong>Name:</strong> {frappe.utils.escape_html(name)}<br>
-              <strong>Email:</strong> {frappe.utils.escape_html(email)}<br>
-              <strong>Phone:</strong> {frappe.utils.escape_html(phone or '-')}<br>
-              <strong>Page:</strong> {frappe.utils.escape_html(page_url or '-')}</p>
-              <div style="background:#f8fafc;border-left:3px solid #0f766e;padding:10px 12px;margin:12px 0;">
-                {frappe.utils.escape_html(message)}
-              </div>
-              <p><a href="{lead_url}" style="display:inline-block;padding:8px 14px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Open Lead in ERPNext</a></p>
-            </div>
-            """,
-            delayed=False,
-        )
-    except Exception:
-        frappe.log_error(frappe.get_traceback(), "Website Live Chat Email Failed")
+        lead_name = frappe.db.get_value("CRM Lead", {"email": email}, "name")
+        if not lead_name:
+            parts = name.strip().split(" ", 1)
+            lead_data = {
+                "doctype": "CRM Lead",
+                "first_name": parts[0],
+                "last_name": parts[1] if len(parts) > 1 else "",
+                "email": email,
+                "mobile_no": phone,
+            }
+            if frappe.db.exists("CRM Lead Source", "Website"):
+                lead_data["source"] = "Website"
+            lead = frappe.get_doc(lead_data)
+            lead.flags.ignore_permissions = True
+            lead.insert()
+            lead_name = lead.name
 
-    return {"status": "success", "lead": lead_name}
+        lead_doc = frappe.get_doc("CRM Lead", lead_name)
+        lead_doc.add_comment(
+            "Comment",
+            f"<strong>Website Live Chat Inquiry</strong><br>"
+            f"<strong>Page:</strong> {frappe.utils.escape_html(page_url or '-')}<br>"
+            f"<strong>Phone:</strong> {frappe.utils.escape_html(phone or '-')}<br>"
+            f"<strong>Message:</strong> {frappe.utils.escape_html(message)}",
+        )
+
+        sales_email = (
+            frappe.db.get_value("Email Account", {"default_outgoing": 1, "enable_outgoing": 1}, "email_id")
+            or "sales@a1its.net"
+        )
+        lead_url = frappe.utils.get_url(f"/crm/leads/{lead_name}")
+
+        try:
+            frappe.sendmail(
+                recipients=[sales_email],
+                sender=sales_email,
+                subject=f"New Website Live Chat Message from {name}",
+                message=f"""
+                <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;">
+                  <h2 style="color:#0f766e;margin-bottom:8px;">New Website Live Chat Inquiry</h2>
+                  <p><strong>Name:</strong> {frappe.utils.escape_html(name)}<br>
+                  <strong>Email:</strong> {frappe.utils.escape_html(email)}<br>
+                  <strong>Phone:</strong> {frappe.utils.escape_html(phone or '-')}<br>
+                  <strong>Page:</strong> {frappe.utils.escape_html(page_url or '-')}</p>
+                  <div style="background:#f8fafc;border-left:3px solid #0f766e;padding:10px 12px;margin:12px 0;">
+                    {frappe.utils.escape_html(message)}
+                  </div>
+                  <p><a href="{lead_url}" style="display:inline-block;padding:8px 14px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Open Lead in Frappe CRM</a></p>
+                </div>
+                """,
+                delayed=False,
+            )
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), "Live Chat Email Failed")
+
+        frappe.db.commit()
+        return {"status": "success", "lead": lead_name}
+    finally:
+        frappe.set_user(orig_user)
 
 @frappe.whitelist(allow_guest=True)
 def get_store_contact():
@@ -640,7 +650,7 @@ def submit_artwork_inquiry():
         frappe.db.get_value("Email Account", {"default_outgoing": 1, "enable_outgoing": 1}, "email_id")
         or "sales@a1its.net"
     )
-    lead_url = frappe.utils.get_url_to_form("Lead", lead_name)
+    lead_url = frappe.utils.get_url(f"/crm/leads/{lead_name}")
     full_file_link = frappe.utils.get_url(uploaded_file_url) if uploaded_file_url else ""
 
     try:
@@ -942,3 +952,74 @@ def guest_redirect_on_action():
     if frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout"):
         return "/cart"
     return frappe.db.get_single_value("Webshop Settings", "redirect_on_action") or "/login"
+@frappe.whitelist(allow_guest=True)
+def create_chat_lead(full_name="", email="", phone="", message=""):
+    full_name = (full_name or "").strip() or "Website Chat Visitor"
+    email = (email or "").strip()
+    phone = (phone or "").strip()
+    message = (message or "").strip()
+
+    if not email and not phone:
+        frappe.throw("Please provide an email address or phone number so our team can reply.")
+
+    lead_name = None
+    if email:
+        lead_name = frappe.db.get_value("CRM Lead", {"email": email}, "name")
+    if not lead_name and phone:
+        lead_name = frappe.db.get_value("CRM Lead", {"mobile_no": phone}, "name")
+
+    if not lead_name:
+        parts = full_name.split(" ", 1)
+        lead_doc = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "first_name": parts[0],
+            "last_name": parts[1] if len(parts) > 1 else "",
+            "email": email,
+            "mobile_no": phone,
+            "source": "Website" if frappe.db.exists("CRM Lead Source", "Website") else None,
+        })
+        lead_doc.flags.ignore_permissions = True
+        lead_doc.insert()
+        lead_name = lead_doc.name
+    else:
+        lead_doc = frappe.get_doc("CRM Lead", lead_name)
+
+    if message:
+        comment_html = (
+            f"<strong>PrintStoreAmaze Live Chat Enquiry</strong><br>"
+            f"<strong>Name:</strong> {frappe.utils.escape_html(full_name)}<br>"
+            f"<strong>Email:</strong> {frappe.utils.escape_html(email or '-')}<br>"
+            f"<strong>Phone / WhatsApp:</strong> {frappe.utils.escape_html(phone or '-')}<br>"
+            f"<strong>Message:</strong> {frappe.utils.escape_html(message)}"
+        )
+        lead_doc.add_comment("Comment", comment_html)
+
+    sales_email = (
+        frappe.db.get_value("Contact Us Settings", None, "email_id")
+        or frappe.db.get_value("Email Account", {"default_outgoing": 1, "enable_outgoing": 1}, "email_id")
+        or "sales@a1its.net"
+    )
+    crm_url = frappe.utils.get_url(f"/crm/leads/{lead_name}")
+
+    try:
+        frappe.sendmail(
+            recipients=[sales_email],
+            sender=sales_email,
+            subject=f"New CRM Lead (Live Chat): {full_name}",
+            message=f"""
+            <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:560px;">
+              <h3 style="color:#0f766e;margin-bottom:8px;">New Website Live Chat Enquiry</h3>
+              <p><strong>Name:</strong> {frappe.utils.escape_html(full_name)}<br>
+              <strong>Email:</strong> {frappe.utils.escape_html(email or '-')}<br>
+              <strong>Phone:</strong> {frappe.utils.escape_html(phone or '-')}</p>
+              <p><strong>Message:</strong><br>{frappe.utils.escape_html(message or '-')}</p>
+              <p><a href="{crm_url}" style="display:inline-block;padding:8px 14px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Open Lead in Frappe CRM</a></p>
+            </div>
+            """,
+            delayed=False,
+        )
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Live Chat CRM Lead Email Failed")
+
+    frappe.db.commit()
+    return {"status": "success", "lead": lead_name}
