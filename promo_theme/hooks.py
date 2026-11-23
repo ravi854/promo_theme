@@ -15,7 +15,7 @@ web_include_js = [
 	"/assets/promo_theme/js/promo_search.js?v=1",
 	"/assets/promo_theme/js/promo_whatsapp.js?v=13",
 	"/assets/promo_theme/js/promo_chat.js?v=6",
-	"/assets/promo_theme/js/promo_guest_checkout.js?v=14"
+	"/assets/promo_theme/js/promo_guest_checkout.js?v=17"
 ]
 
 
@@ -311,7 +311,7 @@ fixtures = [
     {
         "dt": "Custom Field",
         "filters": [
-            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod"]]
+            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over"]]
         ],
     }
 ]
@@ -321,7 +321,7 @@ fixtures = [
     {
         "dt": "Custom Field",
         "filters": [
-            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod"]]
+            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over"]]
         ],
     }
 ]
