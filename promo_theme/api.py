@@ -982,6 +982,32 @@ def _process_guest_checkout_as_admin(
         so.delivery_date = frappe.utils.add_days(frappe.utils.nowdate(), 7)
         if is_cod:
             so.terms = ((so.terms + "\n") if so.terms else "") + "Payment Method: Cash on Delivery (COD) — Collect payment upon delivery."
+        total_order_kg = 0.0
+        for row in so.items:
+            if row.item_code == "COD-DELIVERY":
+                continue
+            info = frappe.db.get_value(
+                "Item",
+                row.item_code,
+                ["weight_per_unit", "weight_uom", "length_cm", "width_cm", "height_cm"],
+                as_dict=True,
+            ) or {}
+            w = float(info.get("weight_per_unit") or 0)
+            if (info.get("weight_uom") or "Kg").strip().lower() in ("g", "gram", "grams"):
+                w = w / 1000.0
+            row_kg = round(w * float(row.qty or 1), 3)
+            total_order_kg += row_kg
+            l, wd, h = int(info.get("length_cm") or 25), int(info.get("width_cm") or 20), int(info.get("height_cm") or 15)
+            dim_str = f"{l}×{wd}×{h} cm"
+            row.psa_dimensions = dim_str
+            row.psa_total_weight = row_kg
+            spec_line = f"Size: {dim_str} | Weight: {row_kg:.2f} kg"
+            if spec_line not in (row.description or ""):
+                row.description = ((row.description + "<br>") if row.description else "") + spec_line
+
+        if total_order_kg > 0:
+            so.terms = ((so.terms + "\n") if so.terms else "") + f"Shipment Total Weight: {total_order_kg:.2f} kg"
+
         so.flags.ignore_permissions = True
         so.insert()
         so.submit()
@@ -1182,6 +1208,66 @@ def create_chat_lead(full_name="", email="", phone="", message=""):
     return {"status": "success", "lead": lead_name}
 
 
+def _build_cart_parcels(party_name=None):
+    parcels = []
+    qname = None
+    if party_name:
+        qname = frappe.db.get_value(
+            "Quotation",
+            {"party_name": party_name, "order_type": "Shopping Cart", "docstatus": 0},
+            "name",
+        )
+    if not qname:
+        try:
+            from webshop.webshop.shopping_cart.cart import _get_cart_quotation
+            quote_obj = _get_cart_quotation()
+            doc = quote_obj.get("doc") if isinstance(quote_obj, dict) else quote_obj
+            qname = doc.name if doc else None
+        except Exception:
+            qname = None
+
+    items = (
+        frappe.db.get_all(
+            "Quotation Item",
+            filters={"parent": qname},
+            fields=["item_code", "qty"],
+        )
+        if qname
+        else []
+    )
+
+    for row in items:
+        if row.item_code == "COD-DELIVERY":
+            continue
+        qty = max(1, int(round(float(row.qty or 1))))
+        item_info = frappe.db.get_value(
+            "Item",
+            row.item_code,
+            ["weight_per_unit", "weight_uom", "length_cm", "width_cm", "height_cm"],
+            as_dict=True,
+        ) or {}
+        w = float(item_info.get("weight_per_unit") or 0.5)
+        uom = (item_info.get("weight_uom") or "Kg").strip().lower()
+        if uom in ("g", "gram", "grams"):
+            w = w / 1000.0
+        w = max(0.1, round(w, 3))
+        l = max(1.0, float(item_info.get("length_cm") or 25))
+        wd = max(1.0, float(item_info.get("width_cm") or 20))
+        h = max(1.0, float(item_info.get("height_cm") or 15))
+        import math
+        boxes_per_unit = 1 if w <= 30.0 else max(1, math.ceil(w / 25.0))
+        box_weight = round(w / boxes_per_unit, 3)
+        parcels.append({
+            "length": l,
+            "width": wd,
+            "height": h,
+            "weight": box_weight,
+            "count": qty * boxes_per_unit,
+        })
+
+    return parcels or [{"length": 35, "width": 25, "height": 20, "weight": 2.0, "count": 1}]
+
+
 @frappe.whitelist(allow_guest=True)
 @rate_limit(limit=25, seconds=60)
 def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pincode="", cart_total=0):
@@ -1189,9 +1275,17 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
     flat_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 150)
     free_over = float(frappe.db.get_single_value("Webshop Settings", "cod_free_delivery_over") or 1500)
 
+    guest_party_init = frappe.request.cookies.get("party_name") if getattr(frappe, "request", None) else None
+    init_parcels = _build_cart_parcels(party_name=guest_party_init)
+    init_boxes = sum(int(x.get("count") or 1) for x in init_parcels)
+    init_kg = round(sum(float(x.get("weight") or 0) * int(x.get("count") or 1) for x in init_parcels), 2)
+    init_dims = ", ".join(f"{int(x['length'])}×{int(x['width'])}×{int(x['height'])}cm" for x in init_parcels[:2])
+    init_summary = f"{init_boxes} parcel(s) • {init_kg} kg ({init_dims} each)"
+
     if free_over > 0 and cart_total >= free_over:
         return {
             "source": "free_threshold",
+            "parcel_summary": init_summary,
             "rates": [
                 {
                     "carrier": "PrintStoreAmaze Courier",
@@ -1203,8 +1297,10 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
 
     bobgo_enabled = bool(frappe.db.exists("DocType", "BobGo") and frappe.db.get_single_value("BobGo", "enabled"))
     if bobgo_enabled and (city or pincode):
+        guest_party = frappe.request.cookies.get("party_name") if getattr(frappe, "request", None) else None
         orig_user = frappe.session.user
         frappe.set_user("Administrator")
+        cart_parcels = _build_cart_parcels(party_name=guest_party)
         try:
             from bobgoshipping.bobgoshipping.doctype.bobgo.bobgo import get_bobgo_utils
             from bobgoshipping.bobgoshipping.utils import get_address
@@ -1245,7 +1341,7 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
                 "mobile_no": "0840277327",
             })
 
-            parcels = [{"length": 35, "width": 25, "height": 20, "weight": 2.0, "count": 1}]
+            parcels = cart_parcels
             bobgo = get_bobgo_utils()
             raw_rates = (
                 bobgo.get_available_services(
@@ -1274,14 +1370,24 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
 
             live_rates.sort(key=lambda x: x["rate_ex_vat"])
             if live_rates:
-                return {"source": "bobgo", "rates": live_rates}
+                tot_boxes = sum(int(x.get("count") or 1) for x in cart_parcels)
+                tot_kg = round(sum(float(x.get("weight") or 0) * int(x.get("count") or 1) for x in cart_parcels), 2)
+                dims_txt = ", ".join(f"{int(x['length'])}×{int(x['width'])}×{int(x['height'])}cm" for x in cart_parcels[:2])
+                summary = f"{tot_boxes} parcel(s) • {tot_kg} kg ({dims_txt} each)"
+                return {"source": "bobgo", "rates": live_rates, "parcel_summary": summary}
         except Exception:
             frappe.log_error(frappe.get_traceback(), "Webshop BobGo Rate Lookup Failed")
         finally:
             frappe.set_user(orig_user)
 
+    guest_party = frappe.request.cookies.get("party_name") if getattr(frappe, "request", None) else None
+    p_list = _build_cart_parcels(party_name=guest_party)
+    tot_boxes = sum(int(x.get("count") or 1) for x in p_list)
+    tot_kg = round(sum(float(x.get("weight") or 0) * int(x.get("count") or 1) for x in p_list), 2)
+    dims_txt = ", ".join(f"{int(x['length'])}×{int(x['width'])}×{int(x['height'])}cm" for x in p_list[:2])
     return {
         "source": "flat_rate",
+        "parcel_summary": f"{tot_boxes} parcel(s) • {tot_kg} kg ({dims_txt}) each",
         "rates": [
             {
                 "carrier": "Standard Courier",

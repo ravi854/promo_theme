@@ -264,6 +264,14 @@ frappe.ready(function () {
         $('.cart-items').html(r.message.items);
         $('.cart-tax-items').html(r.message.total).css('display', 'block');
         $('.payment-summary').html(r.message.taxes_and_totals);
+        if (typeof window.psaLoadParcelDimensions === 'function') {
+          window.psaLoadParcelDimensions();
+        }
+        var calcBtn = document.getElementById('psa-calc-ship-btn');
+        var pinVal = (document.getElementById('gc-pincode') && document.getElementById('gc-pincode').value.trim()) || '';
+        if (calcBtn && pinVal) {
+          calcBtn.click();
+        }
 
         var exVat = 0;
         document.querySelectorAll('.cart-tax-items td, .cart-tax-items .text-right, .payment-summary td').forEach(function (el) {
@@ -399,7 +407,10 @@ frappe.ready(function () {
         var rates = data.rates || [];
         if (!rates.length) return;
 
-        var html = '<div class="font-weight-bold mb-1" style="color:#132a2e;">Select Courier Delivery Option:</div>';
+        var parcelBadge = data.parcel_summary
+          ? '<div class="mb-1" style="font-size:11px;color:#0f766e;font-weight:600;">Shipment: ' + frappe.utils.escape_html(data.parcel_summary) + '</div>'
+          : '';
+        var html = parcelBadge + '<div class="font-weight-bold mb-1" style="color:#132a2e;">Select Courier Delivery Option:</div>';
         rates.forEach(function (rt, idx) {
           var label = rt.carrier + ' — ' + rt.service_name;
           var priceTxt = rt.rate_ex_vat > 0 ? (fmt(rt.rate_ex_vat) + ' ex VAT') : 'FREE';
@@ -588,4 +599,34 @@ document.addEventListener('change', function (e) {
     '<div class="d-flex justify-content-between"><span>VAT (15%):</span><b>' + fmt(vat) + '</b></div>' +
     '<div class="d-flex justify-content-between mt-1 pt-1" style="border-top:1px solid #99f6e4;color:#0f766e;font-size:13.5px;">' +
     '<span><b>Final Total (incl. VAT):</b></span><b>' + fmt(taxableSub + vat) + '</b></div>';
+});
+
+frappe.ready(function () {
+  if (window.location.pathname.replace(/\/+$/, '') !== '/cart') return;
+
+  window.psaLoadParcelDimensions = function () {
+    frappe.call({
+      method: 'promo_theme.api.get_webshop_shipping_rates',
+      args: { cart_total: 0 },
+      callback: function (r) {
+        var summary = r && r.message && r.message.parcel_summary;
+        if (!summary) return;
+        var box = document.getElementById('psa-guest-checkout-box');
+        var form = document.getElementById('psa-guest-checkout-form');
+        if (!box || !form) return;
+
+        var badge = document.getElementById('psa-parcel-dimensions-badge');
+        if (!badge) {
+          badge = document.createElement('div');
+          badge.id = 'psa-parcel-dimensions-badge';
+          badge.style.cssText = 'background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:6px 10px;margin-bottom:8px;font-size:11.5px;color:#132a2e;font-weight:600;';
+          box.insertBefore(badge, form);
+        }
+        badge.innerHTML = '&#128230; Shipment Size &amp; Weight: <span style="color:#0f766e;">' + frappe.utils.escape_html(summary) + '</span>';
+      }
+    });
+  };
+
+  setTimeout(window.psaLoadParcelDimensions, 600);
+  setTimeout(window.psaLoadParcelDimensions, 1400);
 });

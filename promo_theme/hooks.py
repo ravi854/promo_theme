@@ -15,7 +15,7 @@ web_include_js = [
 	"/assets/promo_theme/js/promo_search.js?v=1",
 	"/assets/promo_theme/js/promo_whatsapp.js?v=14",
 	"/assets/promo_theme/js/promo_chat.js?v=6",
-	"/assets/promo_theme/js/promo_guest_checkout.js?v=28"
+	"/assets/promo_theme/js/promo_guest_checkout.js?v=31"
 ]
 
 
@@ -307,11 +307,14 @@ home_page = "promo_home"
 
 
 fixtures = [
-    {"dt": "Print Format", "filters": [["name", "in", ["PrintStoreAmaze Quote", "PrintStoreAmaze Order", "PrintStoreAmaze Tax Invoice"]]]},
+    {"dt": "Custom Field", "filters": [["name", "in", ['Item-is_zero_rated', 'Sales Invoice Item-is_zero_rated', 'Item-published_in_website', 'Website Item-custom_is_brandable', 'Website Item-custom_new_arrival', 'Website Item-industry', 'Webshop Settings-enable_guest_checkout', 'Webshop Settings-enable_cod', 'Webshop Settings-cod_delivery_charge', 'Webshop Settings-cod_free_delivery_over', 'Item-length_cm', 'Item-width_cm', 'Item-height_cm', 'Sales Order Item-psa_dimensions', 'Sales Order Item-psa_total_weight', 'Sales Invoice Item-psa_dimensions', 'Sales Invoice Item-psa_total_weight', 'Item-custom_unit_weight_and_dimension_for_couriers', 'Item-custom_column_break_zlpfc']]]},
+    {"dt": "Property Setter", "filters": [["name", "in", ['Sales Invoice Item-barcode-hidden', 'Sales Invoice Item-accounting_dimensions_section-hidden', 'Sales Order Item-accounting_dimensions_section-hidden', 'Sales Invoice Item-discount_and_margin-hidden', 'Sales Order Item-discount_and_margin-hidden', 'Item-naming_series-reqd', 'Item-naming_series-hidden', 'Item-item_code-hidden', 'Item-item_code-reqd', 'Sales Order Item-conversion_factor-precision', 'Sales Invoice Item-conversion_factor-precision', 'Website Item-main-field_order', 'Item-item_name-in_list_view', 'Item-published_in_website-in_list_view', 'Item-is_sales_item-in_list_view', 'Item-stock_uom-in_list_view', 'Item-is_fixed_asset-in_list_view', 'Item-item_group-in_list_view', 'Sales Invoice Item-discount_account-hidden', 'Sales Invoice Item-discount_account-mandatory_depends_on', 'Item-main-field_order']]]},
+    {"dt": "Print Format", "filters": [["name", "like", "PrintStoreAmaze%"]]},
+]]]},
     {
         "dt": "Custom Field",
         "filters": [
-            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over", "Website Item-industry"]]
+            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over", "Website Item-industry", "Item-length_cm", "Item-width_cm", "Item-height_cm", "Sales Invoice Item-psa_total_weight", "Sales Invoice Item-psa_dimensions", "Sales Order Item-psa_total_weight", "Sales Order Item-psa_dimensions"]]
         ],
     }
 ]
@@ -321,7 +324,7 @@ fixtures = [
     {
         "dt": "Custom Field",
         "filters": [
-            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over", "Website Item-industry"]]
+            ["name", "in", ["Webshop Settings-enable_guest_checkout", "Webshop Settings-enable_cod", "Webshop Settings-cod_delivery_charge", "Webshop Settings-cod_free_delivery_over", "Website Item-industry", "Item-length_cm", "Item-width_cm", "Item-height_cm", "Sales Invoice Item-psa_total_weight", "Sales Invoice Item-psa_dimensions", "Sales Order Item-psa_total_weight", "Sales Order Item-psa_dimensions"]]
         ],
     }
 ]
