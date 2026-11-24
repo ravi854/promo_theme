@@ -1493,3 +1493,17 @@ def auto_create_material_request_for_so(doc, method=None):
         f"Material Request <b>{mr.name}</b> ({mr_type}) automatically generated for Sales Order <b>{doc.name}</b>.",
         alert=True,
     )
+
+
+@frappe.whitelist(allow_guest=True)
+def get_promo_banner():
+    enabled = bool(frappe.db.get_single_value("Webshop Settings", "enable_promo_banner"))
+    if not enabled:
+        return {"enabled": 0}
+    return {
+        "enabled": 1,
+        "text": frappe.db.get_single_value("Webshop Settings", "promo_banner_text")
+        or "SPECIAL PROMOTION: Bulk Discounts + FREE Digital Artwork Mockups!",
+        "btn_text": frappe.db.get_single_value("Webshop Settings", "promo_banner_btn_text") or "Shop Now →",
+        "btn_link": frappe.db.get_single_value("Webshop Settings", "promo_banner_btn_link") or "/all-products",
+    }

@@ -347,3 +347,65 @@ frappe.ready(function () {
     a.setAttribute('href', '/');
   });
 });
+
+frappe.ready(function () {
+  var path = window.location.pathname || '';
+  if (
+    path.startsWith('/app') ||
+    path.startsWith('/desk') ||
+    path.startsWith('/helpdesk') ||
+    path.startsWith('/raven') ||
+    path.startsWith('/login')
+  ) {
+    return;
+  }
+  frappe.call({
+    method: 'promo_theme.api.get_promo_banner',
+    callback: function (r) {
+      var data = r && r.message;
+      if (!data || !data.enabled || document.getElementById('psa-floating-promo-bar')) return;
+
+      var bar = document.createElement('div');
+      bar.id = 'psa-floating-promo-bar';
+      bar.style.cssText = [
+        'position:fixed',
+        'top:0',
+        'left:0',
+        'right:0',
+        'z-index:1060',
+        'width:100%',
+        'background:linear-gradient(90deg, #132a2e 0%, #0f766e 50%, #132a2e 100%)',
+        'color:#ffffff',
+        'padding:9px 16px',
+        'font-size:13px',
+        'line-height:1.35',
+        'box-shadow:0 4px 14px rgba(0,0,0,0.22)',
+        'display:flex',
+        'align-items:center',
+        'justify-content:center',
+        'flex-wrap:wrap',
+        'gap:10px',
+        'text-align:center'
+      ].join(';');
+
+      var badge = '<span style="background:#f59e0b;color:#132a2e;font-weight:800;font-size:10.5px;letter-spacing:0.6px;padding:2px 8px;border-radius:999px;text-transform:uppercase;">PROMO</span>';
+      var textHtml = '<span style="font-weight:600;">' + frappe.utils.escape_html(data.text || '') + '</span>';
+      var btnHtml = data.btn_text
+        ? '<a href="' + frappe.utils.escape_html(data.btn_link || '/all-products') + '" style="background:#ffffff;color:#0f766e;font-weight:700;font-size:12px;padding:3px 12px;border-radius:999px;text-decoration:none;white-space:nowrap;">' +
+          frappe.utils.escape_html(data.btn_text) + '</a>'
+        : '';
+
+      bar.innerHTML = badge + textHtml + btnHtml;
+      document.body.insertBefore(bar, document.body.firstChild);
+
+      var adjustTopOffset = function () {
+        var h = bar.offsetHeight || 38;
+        document.body.style.paddingTop = h + 'px';
+        var nav = document.querySelector('nav.navbar.sticky-top, nav.navbar.fixed-top, header.sticky-top');
+        if (nav) nav.style.top = h + 'px';
+      };
+      adjustTopOffset();
+      window.addEventListener('resize', adjustTopOffset);
+    }
+  });
+});
