@@ -319,6 +319,8 @@ fixtures = [
                 "Website Item-custom_is_brandable",
                 "Website Item-custom_new_arrival",
                 "Website Item-industry",
+                "Webshop Settings-psa_checkout_fulfillment_sb",
+                "Webshop Settings-psa_checkout_fulfillment_cb",
                 "Webshop Settings-enable_guest_checkout",
                 "Webshop Settings-enable_cod",
                 "Webshop Settings-cod_delivery_charge",
