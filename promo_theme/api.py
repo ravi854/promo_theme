@@ -1208,11 +1208,14 @@ def create_chat_lead(full_name="", email="", phone="", message=""):
     return {"status": "success", "lead": lead_name}
 
 
-def _build_cart_parcels(party_name=None, cart_id=None):
+def _build_cart_parcels(party_name=None, cart_id=None, qname_override=None):
+    import math
     parcels = []
-    qname = None
-    if cart_id and frappe.db.exists("Quotation", {"name": cart_id, "docstatus": 0}):
+    qname = qname_override
+
+    if not qname and cart_id and frappe.db.exists("Quotation", {"name": cart_id, "docstatus": 0}):
         qname = cart_id
+
     if not qname and party_name:
         qname = frappe.db.get_value(
             "Quotation",
@@ -1220,6 +1223,7 @@ def _build_cart_parcels(party_name=None, cart_id=None):
             "name",
             order_by="modified desc",
         )
+
     if not qname:
         try:
             from webshop.webshop.shopping_cart.cart import _get_cart_quotation
@@ -1257,8 +1261,7 @@ def _build_cart_parcels(party_name=None, cart_id=None):
         l = max(1.0, float(item_info.get("length_cm") or 25))
         wd = max(1.0, float(item_info.get("width_cm") or 20))
         h = max(1.0, float(item_info.get("height_cm") or 15))
-        import math
-        boxes_per_unit = 1 if w <= 30.0 else max(1, math.ceil(w / 25.0))
+        boxes_per_unit = 1
         box_weight = round(w / boxes_per_unit, 3)
         parcels.append({
             "length": l,
@@ -1274,12 +1277,21 @@ def _build_cart_parcels(party_name=None, cart_id=None):
 @frappe.whitelist(allow_guest=True)
 @rate_limit(limit=25, seconds=60)
 def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pincode="", cart_total=0):
+    active_qname = None
+    try:
+        from webshop.webshop.shopping_cart.cart import _get_cart_quotation
+        _qo = _get_cart_quotation()
+        _qdoc = _qo.get("doc") if isinstance(_qo, dict) else _qo
+        if _qdoc and getattr(_qdoc, "name", None):
+            active_qname = _qdoc.name
+    except Exception:
+        active_qname = None
     cart_total = float(cart_total or 0)
     flat_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 150)
     free_over = float(frappe.db.get_single_value("Webshop Settings", "cod_free_delivery_over") or 1500)
 
     init_cookies = getattr(frappe, "request", None) and frappe.request.cookies or {}
-    init_parcels = _build_cart_parcels(party_name=init_cookies.get("party_name"), cart_id=init_cookies.get("cart_id"))
+    init_parcels = _build_cart_parcels(party_name=init_cookies.get("party_name"), cart_id=init_cookies.get("cart_id"), qname_override=active_qname)
     init_boxes = sum(int(x.get("count") or 1) for x in init_parcels)
     init_kg = round(sum(float(x.get("weight") or 0) * int(x.get("count") or 1) for x in init_parcels), 2)
     init_dims = ", ".join(f"{int(x['length'])}×{int(x['width'])}×{int(x['height'])}cm" for x in init_parcels[:2])
@@ -1305,7 +1317,7 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
         guest_cart_id = cookies.get("cart_id")
         orig_user = frappe.session.user
         frappe.set_user("Administrator")
-        cart_parcels = _build_cart_parcels(party_name=guest_party, cart_id=guest_cart_id)
+        cart_parcels = _build_cart_parcels(party_name=guest_party, cart_id=guest_cart_id, qname_override=active_qname)
         try:
             from bobgoshipping.bobgoshipping.doctype.bobgo.bobgo import get_bobgo_utils
             from bobgoshipping.bobgoshipping.utils import get_address
@@ -1386,7 +1398,7 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
             frappe.set_user(orig_user)
 
     flat_cookies = getattr(frappe, "request", None) and frappe.request.cookies or {}
-    p_list = _build_cart_parcels(party_name=flat_cookies.get("party_name"), cart_id=flat_cookies.get("cart_id"))
+    p_list = _build_cart_parcels(party_name=flat_cookies.get("party_name"), cart_id=flat_cookies.get("cart_id"), qname_override=active_qname)
     tot_boxes = sum(int(x.get("count") or 1) for x in p_list)
     tot_kg = round(sum(float(x.get("weight") or 0) * int(x.get("count") or 1) for x in p_list), 2)
     dims_txt = ", ".join(f"{int(x['length'])}×{int(x['width'])}×{int(x['height'])}cm" for x in p_list[:2])
