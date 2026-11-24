@@ -1412,3 +1412,79 @@ def get_cod_challenge():
         "token": token,
         "question": f"What is {a} + {b}?",
     }
+
+
+def auto_create_material_request_for_so(doc, method=None):
+    """Automatically create & submit a linked Material Request based on Webshop Settings."""
+    if not doc or doc.doctype != "Sales Order":
+        return
+
+    enabled = bool(frappe.db.get_single_value("Webshop Settings", "auto_create_material_request"))
+    if not enabled:
+        return
+
+    already_exists = frappe.db.exists(
+        "Material Request Item",
+        {"sales_order": doc.name, "docstatus": ["<", 2]},
+    )
+    if already_exists:
+        return
+
+    mr_type = (frappe.db.get_single_value("Webshop Settings", "auto_mr_type") or "Purchase").strip()
+    only_shortage = bool(frappe.db.get_single_value("Webshop Settings", "auto_mr_only_shortage"))
+
+    mr_items = []
+    for row in doc.items:
+        if row.item_code == "COD-DELIVERY":
+            continue
+        is_stock = frappe.db.get_value("Item", row.item_code, "is_stock_item")
+        if not is_stock:
+            continue
+
+        req_qty = float(row.qty or 0)
+        if only_shortage and row.warehouse:
+            avail_qty = float(
+                frappe.db.get_value(
+                    "Bin",
+                    {"item_code": row.item_code, "warehouse": row.warehouse},
+                    "actual_qty",
+                )
+                or 0
+            )
+            req_qty = max(0.0, req_qty - max(0.0, avail_qty))
+
+        if req_qty <= 0:
+            continue
+
+        mr_items.append({
+            "item_code": row.item_code,
+            "item_name": row.item_name,
+            "description": row.description,
+            "qty": req_qty,
+            "uom": row.uom,
+            "stock_uom": row.stock_uom,
+            "conversion_factor": row.conversion_factor or 1,
+            "warehouse": row.warehouse,
+            "schedule_date": doc.delivery_date or frappe.utils.add_days(frappe.utils.nowdate(), 3),
+            "sales_order": doc.name,
+            "sales_order_item": row.name,
+        })
+
+    if not mr_items:
+        return
+
+    mr = frappe.get_doc({
+        "doctype": "Material Request",
+        "material_request_type": mr_type,
+        "company": doc.company,
+        "transaction_date": frappe.utils.nowdate(),
+        "schedule_date": doc.delivery_date or frappe.utils.add_days(frappe.utils.nowdate(), 3),
+        "items": mr_items,
+    })
+    mr.flags.ignore_permissions = True
+    mr.insert()
+    mr.submit()
+    frappe.msgprint(
+        f"Material Request <b>{mr.name}</b> ({mr_type}) automatically generated for Sales Order <b>{doc.name}</b>.",
+        alert=True,
+    )
