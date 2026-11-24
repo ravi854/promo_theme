@@ -1208,14 +1208,17 @@ def create_chat_lead(full_name="", email="", phone="", message=""):
     return {"status": "success", "lead": lead_name}
 
 
-def _build_cart_parcels(party_name=None):
+def _build_cart_parcels(party_name=None, cart_id=None):
     parcels = []
     qname = None
-    if party_name:
+    if cart_id and frappe.db.exists("Quotation", {"name": cart_id, "docstatus": 0}):
+        qname = cart_id
+    if not qname and party_name:
         qname = frappe.db.get_value(
             "Quotation",
             {"party_name": party_name, "order_type": "Shopping Cart", "docstatus": 0},
             "name",
+            order_by="modified desc",
         )
     if not qname:
         try:
@@ -1275,8 +1278,8 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
     flat_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 150)
     free_over = float(frappe.db.get_single_value("Webshop Settings", "cod_free_delivery_over") or 1500)
 
-    guest_party_init = frappe.request.cookies.get("party_name") if getattr(frappe, "request", None) else None
-    init_parcels = _build_cart_parcels(party_name=guest_party_init)
+    init_cookies = getattr(frappe, "request", None) and frappe.request.cookies or {}
+    init_parcels = _build_cart_parcels(party_name=init_cookies.get("party_name"), cart_id=init_cookies.get("cart_id"))
     init_boxes = sum(int(x.get("count") or 1) for x in init_parcels)
     init_kg = round(sum(float(x.get("weight") or 0) * int(x.get("count") or 1) for x in init_parcels), 2)
     init_dims = ", ".join(f"{int(x['length'])}×{int(x['width'])}×{int(x['height'])}cm" for x in init_parcels[:2])
@@ -1297,10 +1300,12 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
 
     bobgo_enabled = bool(frappe.db.exists("DocType", "BobGo") and frappe.db.get_single_value("BobGo", "enabled"))
     if bobgo_enabled and (city or pincode):
-        guest_party = frappe.request.cookies.get("party_name") if getattr(frappe, "request", None) else None
+        cookies = getattr(frappe, "request", None) and frappe.request.cookies or {}
+        guest_party = cookies.get("party_name")
+        guest_cart_id = cookies.get("cart_id")
         orig_user = frappe.session.user
         frappe.set_user("Administrator")
-        cart_parcels = _build_cart_parcels(party_name=guest_party)
+        cart_parcels = _build_cart_parcels(party_name=guest_party, cart_id=guest_cart_id)
         try:
             from bobgoshipping.bobgoshipping.doctype.bobgo.bobgo import get_bobgo_utils
             from bobgoshipping.bobgoshipping.utils import get_address
@@ -1380,8 +1385,8 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
         finally:
             frappe.set_user(orig_user)
 
-    guest_party = frappe.request.cookies.get("party_name") if getattr(frappe, "request", None) else None
-    p_list = _build_cart_parcels(party_name=guest_party)
+    flat_cookies = getattr(frappe, "request", None) and frappe.request.cookies or {}
+    p_list = _build_cart_parcels(party_name=flat_cookies.get("party_name"), cart_id=flat_cookies.get("cart_id"))
     tot_boxes = sum(int(x.get("count") or 1) for x in p_list)
     tot_kg = round(sum(float(x.get("weight") or 0) * int(x.get("count") or 1) for x in p_list), 2)
     dims_txt = ", ".join(f"{int(x['length'])}×{int(x['width'])}×{int(x['height'])}cm" for x in p_list[:2])
