@@ -1553,3 +1553,88 @@ def get_promo_banner():
         "btn_text": frappe.db.get_single_value("Webshop Settings", "promo_banner_btn_text") or "Shop Now →",
         "btn_link": frappe.db.get_single_value("Webshop Settings", "promo_banner_btn_link") or "/all-products",
     }
+
+
+@frappe.whitelist(allow_guest=True)
+def get_google_marketing_config():
+    return {
+        "gtm_id": (frappe.db.get_single_value("Webshop Settings", "google_gtm_id") or "").strip(),
+        "ga4_id": (frappe.db.get_single_value("Webshop Settings", "google_ga4_id") or "").strip(),
+        "ads_conversion_id": (frappe.db.get_single_value("Webshop Settings", "google_ads_conversion_id") or "").strip(),
+    }
+
+
+@frappe.whitelist(allow_guest=True)
+def google_merchant_feed():
+    from xml.sax.saxutils import escape
+
+    enabled = bool(frappe.db.get_single_value("Webshop Settings", "enable_google_merchant_feed"))
+    if not enabled:
+        frappe.throw("Google Merchant Feed is disabled in Webshop Settings.", frappe.PermissionError)
+
+    base_url = frappe.utils.get_url().rstrip("/")
+    store_name = frappe.db.get_single_value("Website Settings", "app_name") or "Storefront"
+    price_list = frappe.db.get_single_value("Webshop Settings", "price_list") or "Standard Selling"
+
+    web_items = frappe.get_all(
+        "Website Item",
+        filters={"published": 1},
+        fields=["item_code", "web_item_name", "route", "website_image", "short_description", "description", "brand"],
+    )
+
+    xml_items = []
+    for wi in web_items:
+        if wi.item_code == "COD-DELIVERY":
+            continue
+        price = frappe.db.get_value(
+            "Item Price",
+            {"item_code": wi.item_code, "price_list": price_list, "selling": 1},
+            "price_list_rate",
+        )
+        if not price or float(price) <= 0:
+            continue
+
+        # Google Merchant Center South Africa requires VAT-inclusive ZAR prices
+        price_incl_vat = round(float(price) * 1.15, 2)
+        link = f"{base_url}/{(wi.route or '').lstrip('/')}"
+        img = wi.website_image or ""
+        if img and not img.startswith("http"):
+            img = f"{base_url}/{img.lstrip('/')}"
+        desc = frappe.utils.strip_html_tags(wi.short_description or wi.description or wi.web_item_name or "")[:4900]
+        brand = wi.brand or store_name
+
+        avail = "in_stock"
+        actual_qty = frappe.db.sql(
+            "SELECT COALESCE(SUM(actual_qty), 0) FROM `tabBin` WHERE item_code=%s", wi.item_code
+        )[0][0]
+        if float(actual_qty or 0) <= 0:
+            avail = "preorder"
+
+        xml_items.append(f"""    <item>
+      <g:id>{escape(wi.item_code)}</g:id>
+      <g:title>{escape((wi.web_item_name or wi.item_code)[:150])}</g:title>
+      <g:description>{escape(desc or wi.web_item_name or wi.item_code)}</g:description>
+      <g:link>{escape(link)}</g:link>
+      {f"<g:image_link>{escape(img)}</g:image_link>" if img else ""}
+      <g:condition>new</g:condition>
+      <g:availability>{avail}</g:availability>
+      <g:price>{price_incl_vat:.2f} ZAR</g:price>
+      <g:brand>{escape(brand)}</g:brand>
+      <g:mpn>{escape(wi.item_code)}</g:mpn>
+    </item>""")
+
+    xml_body = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://google.com">
+  <channel>
+    <title>{escape(store_name)} Product Feed</title>
+    <link>{escape(base_url)}</link>
+    <description>Google Merchant Center Product Feed</description>
+{chr(10).join(xml_items)}
+  </channel>
+</rss>"""
+
+    frappe.response["type"] = "page"
+    frappe.response["page_name"] = "google-merchant-feed.xml"
+    frappe.local.response.http_status_code = 200
+    frappe.local.response.headers["Content-Type"] = "application/xml; charset=utf-8"
+    frappe.local.response.data = xml_body

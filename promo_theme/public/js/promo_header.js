@@ -409,3 +409,76 @@ frappe.ready(function () {
     }
   });
 });
+
+frappe.ready(function () {
+  var path = window.location.pathname || '';
+  if (path.startsWith('/app') || path.startsWith('/desk') || path.startsWith('/helpdesk') || path.startsWith('/raven')) {
+    return;
+  }
+
+  frappe.call({
+    method: 'promo_theme.api.get_google_marketing_config',
+    callback: function (r) {
+      var cfg = r && r.message;
+      if (!cfg) return;
+
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+
+      if (cfg.gtm_id && !document.getElementById('psa-gtm-script')) {
+        window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+        var gtm = document.createElement('script');
+        gtm.id = 'psa-gtm-script';
+        gtm.async = true;
+        gtm.src = 'https://googletagmanager.com' + encodeURIComponent(cfg.gtm_id);
+        document.head.appendChild(gtm);
+      }
+
+      if (cfg.ga4_id && !document.getElementById('psa-ga4-script')) {
+        var ga = document.createElement('script');
+        ga.id = 'psa-ga4-script';
+        ga.async = true;
+        ga.src = 'https://googletagmanager.com' + encodeURIComponent(cfg.ga4_id);
+        document.head.appendChild(ga);
+
+        window.gtag('js', new Date());
+        window.gtag('config', cfg.ga4_id, { currency: 'ZAR' });
+      }
+
+      if (cfg.ads_conversion_id) {
+        var adsBase = cfg.ads_conversion_id.split('/')[0];
+        if (adsBase) {
+          window.gtag('config', adsBase);
+        }
+      }
+
+      if (path.replace(/\/+$/, '') === '/cart') {
+        window.gtag('event', 'begin_checkout', { currency: 'ZAR' });
+      }
+
+      $(document).ajaxSuccess(function (event, xhr, settings) {
+        if (!settings || !settings.url || settings.url.indexOf('submit_guest_checkout') === -1) return;
+        try {
+          var resp = xhr.responseJSON || JSON.parse(xhr.responseText || '{}');
+          var msg = resp && resp.message;
+          if (msg && msg.sales_order) {
+            var val = parseFloat(msg.grand_total || 0) || 0;
+            window.gtag('event', 'purchase', {
+              transaction_id: msg.sales_order,
+              value: val,
+              currency: 'ZAR'
+            });
+            if (cfg.ads_conversion_id) {
+              window.gtag('event', 'conversion', {
+                send_to: cfg.ads_conversion_id,
+                value: val,
+                currency: 'ZAR',
+                transaction_id: msg.sales_order
+              });
+            }
+          }
+        } catch (e) {}
+      });
+    }
+  });
+});
