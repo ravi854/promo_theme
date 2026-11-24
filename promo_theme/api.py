@@ -1359,12 +1359,28 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
             })
 
             parcels = cart_parcels
+            def _to_bobgo_api_parcels(parcels):
+                import math
+                out = []
+                for x in parcels:
+                    w = float(x.get("weight") or 0.5)
+                    cnt = int(x.get("count") or 1)
+                    boxes = 1 if w <= 30.0 else max(1, math.ceil(w / 25.0))
+                    out.append({
+                        "length": x.get("length", 25),
+                        "width": x.get("width", 20),
+                        "height": x.get("height", 15),
+                        "weight": round(w / boxes, 3),
+                        "count": cnt * boxes,
+                    })
+                return out
+
             bobgo = get_bobgo_utils()
             raw_rates = (
                 bobgo.get_available_services(
                     pickup_address=pickup_address,
                     delivery_address=delivery_address,
-                    parcels=parcels,
+                    parcels=cart_parcels,
                     pickup_contact=contact_stub,
                     delivery_contact=contact_stub,
                     value_of_goods=cart_total or 500,
