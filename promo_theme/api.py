@@ -1418,6 +1418,24 @@ def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pinco
     tot_boxes = sum(int(x.get("count") or 1) for x in p_list)
     tot_kg = round(sum(float(x.get("weight") or 0) * int(x.get("count") or 1) for x in p_list), 2)
     dims_txt = ", ".join(f"{int(x['length'])}×{int(x['width'])}×{int(x['height'])}cm" for x in p_list[:2])
+    divisor = float(frappe.db.get_single_value("Webshop Settings", "volumetric_weight_divisor") or 4000) or 4000.0
+    per_kg_rate = float(frappe.db.get_single_value("Webshop Settings", "road_freight_rate_per_kg") or 4.5)
+    vol_kg = round(sum((float(x.get("length") or 0) * float(x.get("width") or 0) * float(x.get("height") or 0) / divisor) * int(x.get("count") or 1) for x in p_list), 2)
+    chargeable_kg = max(tot_kg, vol_kg)
+    if chargeable_kg > 50:
+        freight_fee = round(flat_fee + (chargeable_kg * per_kg_rate), 2)
+        return {
+            "source": "heavy_freight",
+            "parcel_summary": f"{tot_boxes} parcel(s) • {tot_kg} kg ({dims_txt}) each",
+            "rates": [
+                {
+                    "carrier": "Road Freight Courier",
+                    "service_name": f"Heavy / Pallet Freight ({chargeable_kg} kg chargeable)",
+                    "rate_ex_vat": freight_fee,
+                }
+            ],
+        }
+
     return {
         "source": "flat_rate",
         "parcel_summary": f"{tot_boxes} parcel(s) • {tot_kg} kg ({dims_txt}) each",

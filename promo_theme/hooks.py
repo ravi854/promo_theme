@@ -325,6 +325,8 @@ fixtures = [
                 "Webshop Settings-enable_cod",
                 "Webshop Settings-cod_delivery_charge",
                 "Webshop Settings-cod_free_delivery_over",
+                "Webshop Settings-volumetric_weight_divisor",
+                "Webshop Settings-road_freight_rate_per_kg",
                 "Webshop Settings-auto_mr_only_shortage",
                 "Webshop Settings-promo_banner_btn_link",
                 "Webshop Settings-promo_banner_btn_text",
