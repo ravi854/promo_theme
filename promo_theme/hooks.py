@@ -397,6 +397,9 @@ doc_events = {
     "Item": {
         "after_insert": "promo_theme.api.auto_publish_item_on_insert",
     },
+    "Lead": {
+        "after_insert": "promo_theme.api.sync_erpnext_lead_to_frappe_crm",
+    },
 }
 
 app_include_js = ["/assets/promo_theme/js/item_list.js?v=4"]

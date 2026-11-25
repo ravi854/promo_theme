@@ -106,7 +106,7 @@ frappe.ready(function () {
         resBox.style.border = '1px solid #86efac';
         resBox.style.color = '#14532d';
         resBox.innerHTML = '<strong>Thank you!</strong> Your request has been received' +
-          (msg.quotation ? ' (Reference: <b>' + frappe.utils.escape_html(msg.quotation) + '</b>)' : '') +
+          ( (msg.quotation_id || msg.quotation || msg.lead) ? ' (Reference: <b>' + frappe.utils.escape_html( (msg.quotation_id || msg.quotation || msg.lead)) + '</b>)' : '') +
           '. Our sales team will send your quote and digital mockup shortly.';
         form.reset();
       },

@@ -114,26 +114,31 @@ def submit_guest_quote(full_name, email, phone="", company="", notes=""):
     if frappe.session.user == "Guest" and not bool(frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout")):
         frappe.throw("Guest checkout is currently disabled. Please log in or create an account to continue.")
 
-    if (website_url or "").strip():
-        frappe.throw("Spam submission detected.")
-
-    if (payment_method or "").strip().lower() == "cod":
-        tok = (challenge_token or "").strip()
-        ans = (challenge_answer or "").strip()
-        expected = frappe.cache().get_value(f"psa_cod_cap:{tok}") if tok else None
-        if not expected or str(expected) != ans:
-            frappe.throw("Verification failed. Please solve the security number check to place a Cash on Delivery order.")
-        frappe.cache().delete_value(f"psa_cod_cap:{tok}")
-
     if not full_name or not email:
         frappe.throw("Please enter your full name and email address.")
 
     from webshop.webshop.shopping_cart.cart import _get_cart_quotation
 
-    quote_obj = _get_cart_quotation()
-    doc = quote_obj.get("doc") if quote_obj else None
+    party_name = frappe.request.cookies.get("party_name") if getattr(frappe, "request", None) else None
+    orig_user = frappe.session.user
 
-    if not doc or not doc.items:
+    # Fetch the guest cart quotation BEFORE switching user to Administrator
+    quote_obj = _get_cart_quotation(party_name=party_name) if party_name else _get_cart_quotation()
+    guest_doc = quote_obj.get("doc") if isinstance(quote_obj, dict) else quote_obj
+    cart_items = []
+    if guest_doc and getattr(guest_doc, "items", None):
+        for i in guest_doc.items:
+            if i.item_code != "COD-DELIVERY":
+                cart_items.append({
+                    "item_code": i.item_code,
+                    "qty": i.qty,
+                    "rate": i.rate,
+                })
+
+    try:
+        frappe.set_user("Administrator")
+
+        # 1. Reuse or create ERPNext Lead
         lead_name = frappe.db.get_value("Lead", {"email_id": email}, "name")
         if not lead_name:
             lead = frappe.get_doc({
@@ -147,130 +152,175 @@ def submit_guest_quote(full_name, email, phone="", company="", notes=""):
             lead.flags.ignore_permissions = True
             lead.insert()
             lead_name = lead.name
-        if notes:
-            frappe.get_doc({
-                "doctype": "Comment",
-                "comment_type": "Comment",
-                "reference_doctype": "Lead",
-                "reference_name": lead_name,
-                "content": f"<b>Custom Quote & Mockup Inquiry:</b><br>{frappe.utils.escape_html(notes)}",
-            }).insert(ignore_permissions=True)
-        frappe.db.commit()
-        return {"ok": True, "lead": lead_name, "quotation": None}
 
-    lead_name = frappe.db.get_value("Lead", {"email_id": email}, "name")
-    if not lead_name:
-        lead = frappe.get_doc({
-            "doctype": "Lead",
-            "lead_name": full_name,
-            "email_id": email,
-            "mobile_no": phone,
-            "company_name": company,
-            "source": "Website",
+        # 2. Ensure matching CRM Lead exists in Frappe CRM (/crm)
+        crm_lead_name = None
+        if frappe.db.exists("DocType", "CRM Lead"):
+            crm_lead_name = frappe.db.get_value("CRM Lead", {"email": email}, "name")
+            if not crm_lead_name:
+                sync_erpnext_lead_to_frappe_crm(lead_name)
+                crm_lead_name = frappe.db.get_value("CRM Lead", {"email": email}, "name")
+
+        # 3. If no items in cart, log inquiry comment on Lead & CRM Lead and return
+        if not cart_items:
+            if notes:
+                frappe.get_doc({
+                    "doctype": "Comment",
+                    "comment_type": "Comment",
+                    "reference_doctype": "Lead",
+                    "reference_name": lead_name,
+                    "content": f"<b>Custom Quote & Mockup Inquiry:</b><br>{frappe.utils.escape_html(notes)}",
+                }).insert(ignore_permissions=True)
+                if crm_lead_name:
+                    frappe.get_doc({
+                        "doctype": "Comment",
+                        "comment_type": "Comment",
+                        "reference_doctype": "CRM Lead",
+                        "reference_name": crm_lead_name,
+                        "content": f"<b>Custom Quote & Mockup Inquiry:</b><br>{frappe.utils.escape_html(notes)}",
+                    }).insert(ignore_permissions=True)
+            frappe.db.commit()
+            return {
+                "status": "success",
+                "ok": True,
+                "lead": crm_lead_name or lead_name,
+                "quotation_id": None,
+            }
+
+        # 4. Create and submit a fresh ERPNext Quotation linked to the Lead
+        price_list = (
+            (guest_doc.get("selling_price_list") if guest_doc else None)
+            or frappe.db.get_single_value("Webshop Settings", "price_list")
+            or frappe.db.get_single_value("Selling Settings", "selling_price_list")
+            or "Standard Selling"
+        )
+        pl_currency = (
+            (guest_doc.get("price_list_currency") if guest_doc else None)
+            or frappe.db.get_value("Price List", price_list, "currency")
+            or "ZAR"
+        )
+        default_company = (
+            (guest_doc.get("company") if guest_doc else None)
+            or frappe.db.get_single_value("Webshop Settings", "company")
+            or frappe.defaults.get_global_default("company")
+        )
+
+        qtn = frappe.get_doc({
+            "doctype": "Quotation",
+            "company": default_company,
+            "quotation_to": "Lead",
+            "party_name": lead_name,
+            "customer_name": company or full_name,
+            "contact_display": full_name,
+            "contact_email": email,
+            "contact_mobile": phone,
+            "currency": pl_currency,
+            "selling_price_list": price_list,
+            "price_list_currency": pl_currency,
+            "plc_conversion_rate": 1.0,
+            "conversion_rate": 1.0,
+            "terms": notes or "",
+            "items": cart_items,
         })
-        lead.flags.ignore_permissions = True
-        lead.insert()
-        lead_name = lead.name
+        qtn.flags.ignore_permissions = True
+        qtn.insert()
+        qtn.submit()
 
-    doc.quotation_to = "Lead"
-    doc.party_name = lead_name
-    doc.customer_name = company or full_name
-    doc.contact_display = full_name
-    doc.contact_email = email
-    doc.contact_mobile = phone
-    if notes:
-        doc.terms = notes
+        # Clean up the temporary guest draft quotation if it exists
+        if guest_doc and guest_doc.docstatus == 0 and guest_doc.name != qtn.name:
+            try:
+                frappe.delete_doc("Quotation", guest_doc.name, ignore_permissions=True, force=True)
+            except Exception:
+                pass
 
-    doc.flags.ignore_permissions = True
-    doc.save()
-    doc.submit()
-
-    # Build itemized HTML summary for emails
-    rows_html = "".join(
-        f"<tr>"
-        f"<td style='padding:6px 8px;border:1px solid #e2e8f0;'>{frappe.utils.escape_html(i.item_code)}</td>"
-        f"<td style='padding:6px 8px;border:1px solid #e2e8f0;'>{frappe.utils.escape_html(i.item_name)}</td>"
-        f"<td style='padding:6px 8px;border:1px solid #e2e8f0;text-align:center;'>{int(i.qty)}</td>"
-        f"<td style='padding:6px 8px;border:1px solid #e2e8f0;text-align:right;'>{frappe.utils.fmt_money(i.amount, currency=doc.currency)}</td>"
-        f"</tr>"
-        for i in doc.items
-    )
-
-    items_table = f"""
-    <table style="width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;">
-      <thead>
-        <tr style="background:#f8fafc;">
-          <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;">SKU</th>
-          <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;">Product</th>
-          <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">Qty</th>
-          <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;">Est. Total (ex VAT)</th>
-        </tr>
-      </thead>
-      <tbody>{rows_html}</tbody>
-    </table>
-    """
-
-    notes_block = (
-        f"<p><strong>Branding &amp; Deadline Notes:</strong><br>{frappe.utils.escape_html(notes)}</p>"
-        if notes
-        else ""
-    )
-
-    # 1. Send confirmation email to the guest customer
-    try:
-        frappe.sendmail(
-            recipients=[email],
-            subject=f"PrintStoreAmaze Quote Request Received – Reference {doc.name}",
-            message=f"""
-            <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;">
-              <h2 style="color:#0f766e;margin-bottom:8px;">Thank You for Your Quote Request</h2>
-              <p>Hi {frappe.utils.escape_html(full_name)},</p>
-              <p>We have received your quote request (<strong>{doc.name}</strong>). One of our account managers will review your items, apply any applicable bulk discounts, and send your formal quote with a <strong>free digital artwork mockup</strong> shortly.</p>
-              {items_table}
-              {notes_block}
-              <p style="font-size:12px;color:#64748b;">Need urgent assistance? Call us on <strong>084 027 7327</strong> or reply directly to this email.</p>
-            </div>
-            """,
+        rows_html = "".join(
+            f"<tr>"
+            f"<td style='padding:6px 8px;border:1px solid #e2e8f0;'>{frappe.utils.escape_html(i.item_code)}</td>"
+            f"<td style='padding:6px 8px;border:1px solid #e2e8f0;'>{frappe.utils.escape_html(i.item_name)}</td>"
+            f"<td style='padding:6px 8px;border:1px solid #e2e8f0;text-align:center;'>{int(i.qty)}</td>"
+            f"<td style='padding:6px 8px;border:1px solid #e2e8f0;text-align:right;'>{frappe.utils.fmt_money(i.amount, currency=qtn.currency)}</td>"
+            f"</tr>"
+            for i in qtn.items
         )
-    except Exception:
-        frappe.log_error(frappe.get_traceback(), "Guest Quote Customer Email Failed")
 
-    # 2. Send alert email to your Sales Team
-    sales_email = (
-        frappe.db.get_value("Email Account", {"default_outgoing": 1, "enable_outgoing": 1}, "email_id")
-        or "sales@a1its.net"
-    )
-    desk_url = frappe.utils.get_url_to_form("Quotation", doc.name)
+        items_table = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;">
+          <thead>
+            <tr style="background:#f8fafc;">
+              <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;">SKU</th>
+              <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;">Product</th>
+              <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">Qty</th>
+              <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;">Est. Total (ex VAT)</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}</tbody>
+        </table>
+        """
 
-    try:
-        frappe.sendmail(
-            recipients=[sales_email],
-            subject=f"New Website Quote Request: {doc.name} ({company or full_name})",
-            message=f"""
-            <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;">
-              <h2 style="color:#0f766e;margin-bottom:8px;">New Website Quote Request</h2>
-              <p><strong>Quotation:</strong> <a href="{desk_url}">{doc.name}</a><br>
-              <strong>Name:</strong> {frappe.utils.escape_html(full_name)}<br>
-              <strong>Company:</strong> {frappe.utils.escape_html(company or '-')}<br>
-              <strong>Email:</strong> {frappe.utils.escape_html(email)}<br>
-              <strong>Phone:</strong> {frappe.utils.escape_html(phone or '-')}</p>
-              {items_table}
-              {notes_block}
-              <p><a href="{desk_url}" style="display:inline-block;padding:8px 14px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Open Quotation in ERPNext</a></p>
-            </div>
-            """,
+        notes_block = (
+            f"<p><strong>Branding &amp; Deadline Notes:</strong><br>{frappe.utils.escape_html(notes)}</p>"
+            if notes
+            else ""
         )
-    except Exception:
-        frappe.log_error(frappe.get_traceback(), "Guest Quote Sales Alert Email Failed")
 
-    if hasattr(frappe.local, "cookie_manager"):
-        frappe.local.cookie_manager.delete_cookie("party_name")
+        try:
+            frappe.sendmail(
+                recipients=[email],
+                delayed=True,
+                subject=f"PrintStoreAmaze Quote Request Received – Reference {qtn.name}",
+                message=f"""
+                <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;">
+                  <h2 style="color:#0f766e;margin-bottom:8px;">Thank You for Your Quote Request</h2>
+                  <p>Hi {frappe.utils.escape_html(full_name)},</p>
+                  <p>We have received your quote request (<strong>{qtn.name}</strong>). One of our account managers will review your items, apply any applicable bulk discounts, and send your formal quote with a <strong>free digital artwork mockup</strong> shortly.</p>
+                  {items_table}
+                  {notes_block}
+                  <p style="font-size:12px;color:#64748b;">Need urgent assistance? Call us on <strong>084 027 7327</strong> or reply directly to this email.</p>
+                </div>
+                """,
+            )
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), "Guest Quote Customer Email Failed")
 
-    return {
-        "status": "success",
-        "quotation_id": doc.name,
-    }
+        sales_email = (
+            frappe.db.get_value("Email Account", {"default_outgoing": 1, "enable_outgoing": 1}, "email_id")
+            or "sales@a1its.net"
+        )
+        desk_url = frappe.utils.get_url_to_form("Quotation", qtn.name)
 
+        try:
+            frappe.sendmail(
+                recipients=[sales_email],
+                delayed=True,
+                subject=f"New Website Quote Request: {qtn.name} ({company or full_name})",
+                message=f"""
+                <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;">
+                  <h2 style="color:#0f766e;margin-bottom:8px;">New Website Quote Request</h2>
+                  <p><strong>Quotation:</strong> <a href="{desk_url}">{qtn.name}</a><br>
+                  <strong>Name:</strong> {frappe.utils.escape_html(full_name)}<br>
+                  <strong>Company:</strong> {frappe.utils.escape_html(company or '-')}<br>
+                  <strong>Email:</strong> {frappe.utils.escape_html(email)}<br>
+                  <strong>Phone:</strong> {frappe.utils.escape_html(phone or '-')}</p>
+                  {items_table}
+                  {notes_block}
+                  <p><a href="{desk_url}" style="display:inline-block;padding:8px 14px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Open Quotation in ERPNext</a></p>
+                </div>
+                """,
+            )
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), "Guest Quote Sales Alert Email Failed")
+
+        frappe.db.commit()
+        return {
+            "status": "success",
+            "ok": True,
+            "lead": crm_lead_name or lead_name,
+            "quotation_id": qtn.name,
+        }
+    finally:
+        frappe.set_user(orig_user)
+        if hasattr(frappe.local, "cookie_manager") and party_name:
+            frappe.local.cookie_manager.delete_cookie("party_name")
 
 @frappe.whitelist(allow_guest=True)
 def save_quote_branding_notes(notes=""):
@@ -1721,3 +1771,50 @@ def auto_publish_item_on_insert(doc, method=None):
         item_code=doc.item_code,
         enqueue_after_commit=True,
     )
+
+
+def sync_erpnext_lead_to_frappe_crm(doc, method=None):
+    """Mirror new ERPNext Lead records into Frappe CRM (CRM Lead) if the crm app is installed."""
+    if isinstance(doc, str):
+        doc = frappe.db.get_value(
+            "Lead",
+            doc,
+            ["name", "lead_name", "first_name", "email_id", "mobile_no", "phone", "company_name", "source"],
+            as_dict=True,
+        )
+    if not doc or not frappe.db.exists("DocType", "CRM Lead"):
+        return
+
+    email = (doc.get("email_id") or "").strip()
+    if email and frappe.db.exists("CRM Lead", {"email": email}):
+        return
+
+    meta = frappe.get_meta("CRM Lead")
+    valid_fields = {df.fieldname for df in meta.fields}
+
+    full_name = (doc.get("lead_name") or doc.get("first_name") or email or "Website Lead").strip()
+    first_name, _, last_name = full_name.partition(" ")
+
+    payload = {"doctype": "CRM Lead"}
+    candidate_map = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "lead_name": full_name,
+        "email": email,
+        "mobile_no": (doc.get("mobile_no") or doc.get("phone") or "").strip(),
+        "phone": (doc.get("phone") or doc.get("mobile_no") or "").strip(),
+        "organization": (doc.get("company_name") or "").strip(),
+        "company_name": (doc.get("company_name") or "").strip(),
+        "source": doc.get("source") or "Website",
+    }
+
+    for k, v in candidate_map.items():
+        if k in valid_fields and v:
+            payload[k] = v
+
+    try:
+        crm_lead = frappe.get_doc(payload)
+        crm_lead.flags.ignore_permissions = True
+        crm_lead.insert()
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Sync to Frappe CRM Lead Failed: {doc.name}")
