@@ -9,6 +9,7 @@ web_include_css = ["/assets/promo_theme/css/promo_store.css?v=49"]
 
 web_include_js = [
 	"/assets/promo_theme/js/promo_store.js?v=14",
+    "/assets/promo_theme/js/promo_branding.js?v=14",
     "/assets/promo_theme/js/variant_swatches.js?v=8",
     "/assets/promo_theme/js/promo_header.js?v=27",
 	"/assets/promo_theme/js/promo_footer.js?v=3",
