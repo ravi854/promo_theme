@@ -114,17 +114,6 @@ def submit_guest_quote(full_name, email, phone="", company="", notes=""):
     if frappe.session.user == "Guest" and not bool(frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout")):
         frappe.throw("Guest checkout is currently disabled. Please log in or create an account to continue.")
 
-    if (website_url or "").strip():
-        frappe.throw("Spam submission detected.")
-
-    if (payment_method or "").strip().lower() == "cod":
-        tok = (challenge_token or "").strip()
-        ans = (challenge_answer or "").strip()
-        expected = frappe.cache().get_value(f"psa_cod_cap:{tok}") if tok else None
-        if not expected or str(expected) != ans:
-            frappe.throw("Verification failed. Please solve the security number check to place a Cash on Delivery order.")
-        frappe.cache().delete_value(f"psa_cod_cap:{tok}")
-
     if not full_name or not email:
         frappe.throw("Please enter your full name and email address.")
 
@@ -134,7 +123,29 @@ def submit_guest_quote(full_name, email, phone="", company="", notes=""):
     doc = quote_obj.get("doc") if quote_obj else None
 
     if not doc or not doc.items:
-        frappe.throw("Your Quote List is currently empty.")
+        lead_name = frappe.db.get_value("Lead", {"email_id": email}, "name")
+        if not lead_name:
+            lead = frappe.get_doc({
+                "doctype": "Lead",
+                "lead_name": full_name,
+                "email_id": email,
+                "mobile_no": phone,
+                "company_name": company,
+                "source": "Website",
+            })
+            lead.flags.ignore_permissions = True
+            lead.insert()
+            lead_name = lead.name
+        if notes:
+            frappe.get_doc({
+                "doctype": "Comment",
+                "comment_type": "Comment",
+                "reference_doctype": "Lead",
+                "reference_name": lead_name,
+                "content": f"<b>Custom Quote & Mockup Inquiry:</b><br>{frappe.utils.escape_html(notes)}",
+            }).insert(ignore_permissions=True)
+        frappe.db.commit()
+        return {"ok": True, "lead": lead_name, "quotation": None}
 
     lead_name = frappe.db.get_value("Lead", {"email_id": email}, "name")
     if not lead_name:
