@@ -452,7 +452,31 @@ frappe.ready(function () {
         }
       }
 
+      if (cfg.meta_pixel_id && !window.fbq) {
+        !(function (f, b, e, v, n, t, s) {
+          if (f.fbq) return;
+          n = f.fbq = function () {
+            n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+          };
+          if (!f._fbq) f._fbq = n;
+          n.push = n;
+          n.loaded = !0;
+          n.version = '2.0';
+          n.queue = [];
+          t = b.createElement(e);
+          t.async = !0;
+          t.src = v;
+          s = b.getElementsByTagName(e);
+          s.parentNode.insertBefore(t, s);
+        })(window, document, 'script', 'https://facebook.net');
+        window.fbq('init', cfg.meta_pixel_id);
+        window.fbq('track', 'PageView');
+      }
+
       if (path.replace(/\/+$/, '') === '/cart') {
+        if (window.fbq && cfg.meta_pixel_id) {
+          window.fbq('track', 'InitiateCheckout', { currency: 'ZAR' });
+        }
         window.gtag('event', 'begin_checkout', { currency: 'ZAR' });
       }
 
@@ -463,6 +487,13 @@ frappe.ready(function () {
           var msg = resp && resp.message;
           if (msg && msg.sales_order) {
             var val = parseFloat(msg.grand_total || 0) || 0;
+            if (window.fbq && cfg.meta_pixel_id) {
+              window.fbq('track', 'Purchase', {
+                value: val,
+                currency: 'ZAR',
+                content_type: 'product'
+              });
+            }
             window.gtag('event', 'purchase', {
               transaction_id: msg.sales_order,
               value: val,

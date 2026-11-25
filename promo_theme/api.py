@@ -1561,6 +1561,7 @@ def get_google_marketing_config():
         "gtm_id": (frappe.db.get_single_value("Webshop Settings", "google_gtm_id") or "").strip(),
         "ga4_id": (frappe.db.get_single_value("Webshop Settings", "google_ga4_id") or "").strip(),
         "ads_conversion_id": (frappe.db.get_single_value("Webshop Settings", "google_ads_conversion_id") or "").strip(),
+        "meta_pixel_id": (frappe.db.get_single_value("Webshop Settings", "meta_pixel_id") or "").strip(),
     }
 
 
