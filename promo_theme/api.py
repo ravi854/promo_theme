@@ -167,28 +167,58 @@ def submit_guest_quote(full_name, email, phone="", company="", notes="", website
     try:
         frappe.set_user("Administrator")
 
-        # 1. Reuse or create ERPNext Lead
+        # 1. Reuse & update existing ERPNext Lead or create a new one
+        f_name, _, l_name = full_name.strip().partition(" ")
         lead_name = frappe.db.get_value("Lead", {"email_id": email}, "name")
         if not lead_name:
             lead = frappe.get_doc({
                 "doctype": "Lead",
+                "first_name": f_name or full_name,
+                "last_name": l_name,
                 "lead_name": full_name,
                 "email_id": email,
                 "mobile_no": phone,
                 "company_name": company,
-                "source": "Website",
             })
             lead.flags.ignore_permissions = True
             lead.insert()
             lead_name = lead.name
+        else:
+            updates = {
+                "first_name": f_name or full_name,
+                "last_name": l_name,
+                "lead_name": full_name,
+            }
+            if phone:
+                updates["mobile_no"] = phone
+            if company:
+                updates["company_name"] = company
+            frappe.db.set_value("Lead", lead_name, updates)
 
-        # 2. Ensure matching CRM Lead exists in Frappe CRM (/crm)
+        # 2. Ensure matching CRM Lead exists and stays updated in Frappe CRM (/crm)
         crm_lead_name = None
         if frappe.db.exists("DocType", "CRM Lead"):
             crm_lead_name = frappe.db.get_value("CRM Lead", {"email": email}, "name")
             if not crm_lead_name:
                 sync_erpnext_lead_to_frappe_crm(lead_name)
                 crm_lead_name = frappe.db.get_value("CRM Lead", {"email": email}, "name")
+            elif crm_lead_name:
+                crm_meta = frappe.get_meta("CRM Lead")
+                crm_fields = {df.fieldname for df in crm_meta.fields}
+                crm_updates = {}
+                for k, v in {
+                    "first_name": f_name or full_name,
+                    "last_name": l_name,
+                    "lead_name": full_name,
+                    "mobile_no": phone,
+                    "phone": phone,
+                    "organization": company,
+                    "company_name": company,
+                }.items():
+                    if k in crm_fields and v:
+                        crm_updates[k] = v
+                if crm_updates:
+                    frappe.db.set_value("CRM Lead", crm_lead_name, crm_updates)
 
         # 3. If no items in cart, log inquiry comment on Lead & CRM Lead and return
         if not cart_items:
