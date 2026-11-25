@@ -572,3 +572,41 @@ frappe.ready(function () {
     setTimeout(applyCheck, 900);
   } catch (e) {}
 });
+
+frappe.ready(function () {
+  if (window.location.pathname.replace(/\/+$/, '') !== '/cart') return;
+
+  var insertCartQuoteBtn = function () {
+    if (document.getElementById('psa-cart-request-quote-btn')) return;
+
+    var pastOrdersLink = Array.from(document.querySelectorAll('a, button')).find(function (el) {
+      var t = (el.textContent || '').trim().toLowerCase();
+      return t === 'past orders' || t === 'past order';
+    });
+
+    var continueBtn = Array.from(document.querySelectorAll('a, button')).find(function (el) {
+      var t = (el.textContent || '').trim().toLowerCase();
+      return t === 'continue shopping';
+    });
+
+    var anchor = continueBtn || pastOrdersLink;
+    if (!anchor || !anchor.parentNode) return;
+
+    var quoteBtn = document.createElement('a');
+    quoteBtn.id = 'psa-cart-request-quote-btn';
+    quoteBtn.href = '/request-for-quotation';
+    quoteBtn.className = (continueBtn && continueBtn.className) || (pastOrdersLink && pastOrdersLink.className) || 'btn btn-sm btn-secondary';
+    quoteBtn.style.cssText = 'margin:0 8px;';
+    quoteBtn.textContent = 'Request Quote';
+
+    if (continueBtn && continueBtn.parentNode) {
+      continueBtn.parentNode.insertBefore(quoteBtn, continueBtn);
+    } else if (pastOrdersLink && pastOrdersLink.parentNode) {
+      pastOrdersLink.parentNode.insertBefore(quoteBtn, pastOrdersLink.nextSibling);
+    }
+  };
+
+  insertCartQuoteBtn();
+  setTimeout(insertCartQuoteBtn, 400);
+  setTimeout(insertCartQuoteBtn, 1100);
+});
