@@ -327,11 +327,32 @@ frappe.ready(() => {
             <div class="form-group mb-2">
               <input type="text" id="gq-company" class="form-control form-control-sm" placeholder="Company Name">
             </div>
+            <div style="position:absolute;left:-9999px;opacity:0;height:0;overflow:hidden;" aria-hidden="true">
+              <input type="text" id="gq-website-url" tabindex="-1" autocomplete="off">
+            </div>
+            <div class="form-group mb-2 d-flex align-items-center justify-content-between" style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:6px;padding:5px 8px;">
+              <span style="font-size:11.5px;font-weight:700;color:#132a2e;">Check: <span id="gq-cap-q">...</span> =</span>
+              <input type="hidden" id="gq-cap-tok">
+              <input type="number" id="gq-cap-ans" class="form-control form-control-sm" style="width:68px;text-align:center;" placeholder="?">
+            </div>
             <button type="button" id="gq-submit-btn" class="btn btn-primary btn-sm btn-block font-weight-bold">
               Submit Quote Request
             </button>
           `;
           cartRight.appendChild(guestBox);
+          const loadGqCap = () => {
+            frappe.call({
+              method: 'promo_theme.api.get_quote_captcha',
+              callback: (r) => {
+                if (r && r.message) {
+                  guestBox.querySelector('#gq-cap-q').textContent = r.message.question;
+                  guestBox.querySelector('#gq-cap-tok').value = r.message.token;
+                  guestBox.querySelector('#gq-cap-ans').value = '';
+                }
+              }
+            });
+          };
+          loadGqCap();
 
           guestBox.querySelector('#gq-submit-btn').addEventListener('click', () => {
             const fullName = guestBox.querySelector('#gq-name').value.trim();
@@ -351,7 +372,16 @@ frappe.ready(() => {
 
             frappe.call({
               method: 'promo_theme.api.submit_guest_quote',
-              args: { full_name: fullName, email, phone, company, notes },
+              args: {
+                full_name: fullName,
+                email,
+                phone,
+                company,
+                notes,
+                website_url: (guestBox.querySelector('#gq-website-url')?.value || ''),
+                challenge_token: (guestBox.querySelector('#gq-cap-tok')?.value || ''),
+                challenge_answer: (guestBox.querySelector('#gq-cap-ans')?.value || '')
+              },
               callback: (r) => {
                 if (r.message && r.message.status === 'success') {
                   guestBox.innerHTML = `

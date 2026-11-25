@@ -110,12 +110,41 @@ def get_bulk_pricing_tiers(route=None):
 
 
 @frappe.whitelist(allow_guest=True)
-def submit_guest_quote(full_name, email, phone="", company="", notes=""):
+def get_quote_captcha():
+    import random
+    import uuid
+
+    a = random.randint(2, 9)
+    b = random.randint(1, 9)
+    token = uuid.uuid4().hex
+    frappe.cache().set_value(f"psa_qtn_cap:{token}", str(a + b), expires_in_sec=600)
+    return {"token": token, "question": f"{a} + {b}"}
+
+
+@frappe.whitelist(allow_guest=True)
+def submit_guest_quote(full_name, email, phone="", company="", notes="", website_url="", challenge_token="", challenge_answer=""):
     if frappe.session.user == "Guest" and not bool(frappe.db.get_single_value("Webshop Settings", "enable_guest_checkout")):
         frappe.throw("Guest checkout is currently disabled. Please log in or create an account to continue.")
 
+    if (website_url or "").strip():
+        frappe.throw("Spam submission detected.")
+
+    tok = (challenge_token or "").strip()
+    ans = (challenge_answer or "").strip()
+    expected = frappe.cache().get_value(f"psa_qtn_cap:{tok}") if tok else None
+    if not expected or str(expected) != ans:
+        frappe.throw("Verification failed. Please solve the security number check before submitting your quote.")
+    frappe.cache().delete_value(f"psa_qtn_cap:{tok}")
+
     if not full_name or not email:
         frappe.throw("Please enter your full name and email address.")
+
+    ip = getattr(frappe.local, "request_ip", None) or "unknown"
+    rl_key = f"psa_qtn_rl:{ip}:{(email or "").strip().lower()}"
+    hits = int(frappe.cache().get_value(rl_key) or 0)
+    if hits >= 3:
+        frappe.throw("Too many quote requests submitted. Please wait a few minutes and try again.")
+    frappe.cache().set_value(rl_key, hits + 1, expires_in_sec=600)
 
     from webshop.webshop.shopping_cart.cart import _get_cart_quotation
 
@@ -1779,7 +1808,7 @@ def sync_erpnext_lead_to_frappe_crm(doc, method=None):
         doc = frappe.db.get_value(
             "Lead",
             doc,
-            ["name", "lead_name", "first_name", "email_id", "mobile_no", "phone", "company_name", "source"],
+            ["name", "lead_name", "first_name", "email_id", "mobile_no", "phone", "company_name"],
             as_dict=True,
         )
     if not doc or not frappe.db.exists("DocType", "CRM Lead"):
@@ -1795,9 +1824,16 @@ def sync_erpnext_lead_to_frappe_crm(doc, method=None):
     full_name = (doc.get("lead_name") or doc.get("first_name") or email or "Website Lead").strip()
     first_name, _, last_name = full_name.partition(" ")
 
+    default_status = None
+    if frappe.db.exists("DocType", "CRM Lead Status"):
+        default_status = (
+            frappe.db.get_value("CRM Lead Status", {"name": "New"}, "name")
+            or frappe.db.get_value("CRM Lead Status", {}, "name")
+        )
+
     payload = {"doctype": "CRM Lead"}
     candidate_map = {
-        "first_name": first_name,
+        "first_name": first_name or full_name,
         "last_name": last_name,
         "lead_name": full_name,
         "email": email,
@@ -1805,7 +1841,7 @@ def sync_erpnext_lead_to_frappe_crm(doc, method=None):
         "phone": (doc.get("phone") or doc.get("mobile_no") or "").strip(),
         "organization": (doc.get("company_name") or "").strip(),
         "company_name": (doc.get("company_name") or "").strip(),
-        "source": doc.get("source") or "Website",
+        "status": default_status,
     }
 
     for k, v in candidate_map.items():
@@ -1817,4 +1853,4 @@ def sync_erpnext_lead_to_frappe_crm(doc, method=None):
         crm_lead.flags.ignore_permissions = True
         crm_lead.insert()
     except Exception:
-        frappe.log_error(frappe.get_traceback(), f"Sync to Frappe CRM Lead Failed: {doc.name}")
+        frappe.log_error(frappe.get_traceback(), f"Sync to Frappe CRM Lead Failed: {doc.get('name')}")

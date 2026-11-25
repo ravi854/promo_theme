@@ -13,6 +13,11 @@
       <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 4px 14px rgba(19,42,46,0.05);">
         <h4 style="font-size:1.05rem;font-weight:700;color:#132a2e;margin-bottom:1rem;">Your Contact &amp; Branding Details</h4>
         <form id="psa-rfq-form">
+          <div style="position:absolute;left:-9999px;opacity:0;height:0;overflow:hidden;" aria-hidden="true">
+            <label>Website URL</label>
+            <input type="text" name="website_url" tabindex="-1" autocomplete="off">
+          </div>
+
           <div class="form-group mb-3">
             <label style="font-size:12.5px;font-weight:600;color:#334155;">Full Name *</label>
             <input type="text" class="form-control" name="full_name" required placeholder="e.g. Thabo Mokoena">
@@ -35,6 +40,18 @@
             <label style="font-size:12.5px;font-weight:600;color:#334155;">Branding Technique, Quantities &amp; Deadline</label>
             <textarea class="form-control" name="notes" rows="4" placeholder="Tell us your preferred branding method (Screen Print, Embroidery, Laser Engraving, Sublimation), logo colours, estimated quantities, and event/delivery date..."></textarea>
           </div>
+
+          <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:10px 12px;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <label style="margin:0;font-size:12.5px;font-weight:700;color:#132a2e;">
+              Security Check: What is <span id="psa-rfq-cap-q" style="color:#0f766e;">...</span> ? *
+            </label>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <input type="hidden" name="challenge_token" id="psa-rfq-cap-tok">
+              <input type="number" name="challenge_answer" id="psa-rfq-cap-ans" required class="form-control form-control-sm" style="width:76px;text-align:center;font-weight:700;" placeholder="Ans">
+              <button type="button" id="psa-rfq-cap-refresh" class="btn btn-sm btn-outline-secondary" title="New question">↻</button>
+            </div>
+          </div>
+
           <button type="submit" id="psa-rfq-submit" style="width:100%;background:#0f766e;color:#fff;border:none;border-radius:8px;padding:11px 18px;font-weight:700;font-size:14px;cursor:pointer;">
             Submit Quote &amp; Mockup Request →
           </button>
@@ -80,7 +97,26 @@ frappe.ready(function () {
   var form = document.getElementById('psa-rfq-form');
   var resBox = document.getElementById('psa-rfq-result');
   var btn = document.getElementById('psa-rfq-submit');
+  var qEl = document.getElementById('psa-rfq-cap-q');
+  var tokEl = document.getElementById('psa-rfq-cap-tok');
+  var ansEl = document.getElementById('psa-rfq-cap-ans');
+  var refBtn = document.getElementById('psa-rfq-cap-refresh');
   if (!form) return;
+
+  var loadCaptcha = function () {
+    frappe.call({
+      method: 'promo_theme.api.get_quote_captcha',
+      callback: function (r) {
+        if (r && r.message) {
+          qEl.textContent = r.message.question;
+          tokEl.value = r.message.token;
+          ansEl.value = '';
+        }
+      }
+    });
+  };
+  loadCaptcha();
+  if (refBtn) refBtn.addEventListener('click', loadCaptcha);
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
@@ -95,24 +131,30 @@ frappe.ready(function () {
         email: fd.get('email'),
         phone: fd.get('phone'),
         company: fd.get('company'),
-        notes: fd.get('notes')
+        notes: fd.get('notes'),
+        website_url: fd.get('website_url'),
+        challenge_token: fd.get('challenge_token'),
+        challenge_answer: fd.get('challenge_answer')
       },
       callback: function (r) {
         btn.disabled = false;
         btn.textContent = 'Submit Quote & Mockup Request →';
         var msg = (r && r.message) || {};
+        var refId = msg.quotation_id || msg.quotation || msg.lead;
         resBox.style.display = 'block';
         resBox.style.background = '#f0fdf4';
         resBox.style.border = '1px solid #86efac';
         resBox.style.color = '#14532d';
         resBox.innerHTML = '<strong>Thank you!</strong> Your request has been received' +
-          ( (msg.quotation_id || msg.quotation || msg.lead) ? ' (Reference: <b>' + frappe.utils.escape_html( (msg.quotation_id || msg.quotation || msg.lead)) + '</b>)' : '') +
+          (refId ? ' (Reference: <b>' + frappe.utils.escape_html(refId) + '</b>)' : '') +
           '. Our sales team will send your quote and digital mockup shortly.';
         form.reset();
+        loadCaptcha();
       },
       error: function () {
         btn.disabled = false;
         btn.textContent = 'Submit Quote & Mockup Request →';
+        loadCaptcha();
       }
     });
   });
