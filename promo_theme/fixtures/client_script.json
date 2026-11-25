@@ -1,0 +1,13 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Item",
+  "enabled": 1,
+  "modified": "2026-11-25 09:00:23.204200",
+  "module": null,
+  "name": "Item-List-Bulk-Publish-To-Website",
+  "script": "\nfrappe.listview_settings['Item'] = frappe.listview_settings['Item'] || {};\nconst _orig_onload = frappe.listview_settings['Item'].onload;\nfrappe.listview_settings['Item'].onload = function(listview) {\n    if (_orig_onload) _orig_onload.call(this, listview);\n    const run_publish = () => {\n        const selected = listview.get_checked_items().map(d => d.name);\n        if (!selected.length) {\n            frappe.msgprint(__('Please tick at least one Item checkbox first.'));\n            return;\n        }\n        frappe.confirm(\n            __('Publish {0} selected item(s) to the Webshop?', [selected.length]),\n            () => {\n                frappe.call({\n                    method: 'promo_theme.api.bulk_publish_items_to_website',\n                    args: { item_codes: selected },\n                    freeze: true,\n                    freeze_message: __('Publishing {0} items to Website...', [selected.length]),\n                    callback: (r) => {\n                        const res = r.message || {};\n                        frappe.show_alert({\n                            message: __('Done: {0} created, {1} published on Website.', [res.created || 0, res.published || 0]),\n                            indicator: 'green'\n                        }, 6);\n                        listview.refresh();\n                    }\n                });\n            }\n        );\n    };\n    listview.page.add_action_item(__('Publish to Website'), run_publish);\n    listview.page.add_inner_button(__('Publish to Website'), run_publish);\n};\n",
+  "view": "List"
+ }
+]

@@ -386,6 +386,7 @@ fixtures = [
         ]],
     },
     {"dt": "Print Format", "filters": [["name", "like", "PrintStoreAmaze%"]]},
+    {"dt": "Client Script", "filters": [["name", "=", "Item-List-Bulk-Publish-To-Website"]]},
 ]
 
 doc_events = {
@@ -393,3 +394,5 @@ doc_events = {
         "on_submit": "promo_theme.api.auto_create_material_request_for_so",
     }
 }
+
+app_include_js = ["/assets/promo_theme/js/item_list.js?v=4"]

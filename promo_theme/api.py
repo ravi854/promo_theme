@@ -1639,3 +1639,32 @@ def google_merchant_feed():
     frappe.local.response.http_status_code = 200
     frappe.local.response.headers["Content-Type"] = "application/xml; charset=utf-8"
     frappe.local.response.data = xml_body
+
+
+@frappe.whitelist()
+def bulk_publish_items_to_website(item_codes):
+    import json
+    from webshop.webshop.doctype.website_item.website_item import make_website_item
+
+    if isinstance(item_codes, str):
+        item_codes = json.loads(item_codes)
+    if not item_codes:
+        return {"created": 0, "published": 0}
+
+    created = 0
+    published = 0
+    for code in item_codes:
+        if not code or code == "COD-DELIVERY":
+            continue
+        existing_wi = frappe.db.get_value("Website Item", {"item_code": code}, "name")
+        if existing_wi:
+            frappe.db.set_value("Website Item", existing_wi, "published", 1)
+            published += 1
+            continue
+        if frappe.db.exists("Item", code):
+            item_doc = frappe.get_doc("Item", code)
+            make_website_item(item_doc, save=True)
+            created += 1
+
+    frappe.db.commit()
+    return {"created": created, "published": published}
