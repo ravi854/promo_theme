@@ -8,14 +8,14 @@ app_license = "mit"
 web_include_css = ["/assets/promo_theme/css/promo_store.css?v=49"]
 
 web_include_js = [
-    "/assets/promo_theme/js/promo_store.js?v=12",
+	"/assets/promo_theme/js/promo_store.js?v=14",
     "/assets/promo_theme/js/variant_swatches.js?v=8",
     "/assets/promo_theme/js/promo_header.js?v=27",
 	"/assets/promo_theme/js/promo_footer.js?v=3",
 	"/assets/promo_theme/js/promo_search.js?v=1",
 	"/assets/promo_theme/js/promo_whatsapp.js?v=14",
 	"/assets/promo_theme/js/promo_chat.js?v=6",
-	"/assets/promo_theme/js/promo_guest_checkout.js?v=31"
+	"/assets/promo_theme/js/promo_guest_checkout.js?v=31",
 ]
 
 
