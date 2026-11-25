@@ -134,7 +134,29 @@ def submit_guest_quote(full_name, email, phone="", company="", notes=""):
     doc = quote_obj.get("doc") if quote_obj else None
 
     if not doc or not doc.items:
-        frappe.throw("Your Quote List is currently empty.")
+        lead_name = frappe.db.get_value("Lead", {"email_id": email}, "name")
+        if not lead_name:
+            lead = frappe.get_doc({
+                "doctype": "Lead",
+                "lead_name": full_name,
+                "email_id": email,
+                "mobile_no": phone,
+                "company_name": company,
+                "source": "Website",
+            })
+            lead.flags.ignore_permissions = True
+            lead.insert()
+            lead_name = lead.name
+        if notes:
+            frappe.get_doc({
+                "doctype": "Comment",
+                "comment_type": "Comment",
+                "reference_doctype": "Lead",
+                "reference_name": lead_name,
+                "content": f"<b>Custom Quote & Mockup Inquiry:</b><br>{frappe.utils.escape_html(notes)}",
+            }).insert(ignore_permissions=True)
+        frappe.db.commit()
+        return {"ok": True, "lead": lead_name, "quotation": None}
 
     lead_name = frappe.db.get_value("Lead", {"email_id": email}, "name")
     if not lead_name:

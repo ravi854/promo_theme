@@ -1,0 +1,121 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div style="max-width:960px;margin:2.25rem auto;padding:0 1rem;">
+  <div style="background:linear-gradient(135deg,#132a2e 0%,#0f766e 100%);color:#fff;border-radius:14px;padding:1.75rem 2rem;margin-bottom:1.75rem;">
+    <span style="display:inline-block;background:rgba(255,255,255,0.16);color:#ccfbf1;font-size:11px;font-weight:700;letter-spacing:0.6px;padding:3px 10px;border-radius:999px;text-transform:uppercase;margin-bottom:8px;">B2B Corporate Gifting &amp; Apparel</span>
+    <h1 style="font-size:1.65rem;font-weight:800;margin:0 0 6px 0;color:#fff;">Request a Corporate Quote &amp; Free Digital Mockup</h1>
+    <p style="margin:0;color:#e2e8f0;font-size:0.92rem;">Submit your item list or branding brief below. Our South African sales team will send a formal ex-VAT quote and complimentary digital artwork layout.</p>
+  </div>
+
+  <div class="row">
+    <div class="col-md-7 mb-4">
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 4px 14px rgba(19,42,46,0.05);">
+        <h4 style="font-size:1.05rem;font-weight:700;color:#132a2e;margin-bottom:1rem;">Your Contact &amp; Branding Details</h4>
+        <form id="psa-rfq-form">
+          <div class="form-group mb-3">
+            <label style="font-size:12.5px;font-weight:600;color:#334155;">Full Name *</label>
+            <input type="text" class="form-control" name="full_name" required placeholder="e.g. Thabo Mokoena">
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6 mb-3">
+              <label style="font-size:12.5px;font-weight:600;color:#334155;">Work Email *</label>
+              <input type="email" class="form-control" name="email" required placeholder="name@company.co.za">
+            </div>
+            <div class="form-group col-md-6 mb-3">
+              <label style="font-size:12.5px;font-weight:600;color:#334155;">Phone / WhatsApp *</label>
+              <input type="text" class="form-control" name="phone" required placeholder="082 123 4567">
+            </div>
+          </div>
+          <div class="form-group mb-3">
+            <label style="font-size:12.5px;font-weight:600;color:#334155;">Company / Organisation</label>
+            <input type="text" class="form-control" name="company" placeholder="Company Name (Pty) Ltd">
+          </div>
+          <div class="form-group mb-3">
+            <label style="font-size:12.5px;font-weight:600;color:#334155;">Branding Technique, Quantities &amp; Deadline</label>
+            <textarea class="form-control" name="notes" rows="4" placeholder="Tell us your preferred branding method (Screen Print, Embroidery, Laser Engraving, Sublimation), logo colours, estimated quantities, and event/delivery date..."></textarea>
+          </div>
+          <button type="submit" id="psa-rfq-submit" style="width:100%;background:#0f766e;color:#fff;border:none;border-radius:8px;padding:11px 18px;font-weight:700;font-size:14px;cursor:pointer;">
+            Submit Quote &amp; Mockup Request →
+          </button>
+        </form>
+        <div id="psa-rfq-result" style="display:none;margin-top:1rem;padding:12px 14px;border-radius:8px;font-size:13.5px;"></div>
+      </div>
+    </div>
+
+    <div class="col-md-5 mb-4">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1.35rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;">
+          <h4 style="font-size:1rem;font-weight:700;color:#132a2e;margin:0;">Selected Quote Items ({{ quote_items|length }})</h4>
+          <a href="/all-products" style="font-size:12px;font-weight:600;color:#0f766e;">+ Add Products</a>
+        </div>
+
+        {% if quote_items %}
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem;">
+            {% for item in quote_items %}
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;">
+                <div>
+                  <div style="font-weight:700;color:#132a2e;">{{ item.item_name }}</div>
+                  <div style="color:#64748b;font-size:11px;">SKU: {{ item.item_code }} • Qty: {{ item.qty|int }}</div>
+                </div>
+                <div style="font-weight:700;color:#0f766e;">{{ frappe.utils.fmt_money(item.amount, currency="ZAR") }}</div>
+              </div>
+            {% endfor %}
+          </div>
+          <div style="border-top:1px solid #cbd5e1;padding-top:8px;display:flex;justify-content:space-between;font-weight:700;color:#132a2e;font-size:13.5px;">
+            <span>Estimated Total (ex VAT)</span>
+            <span>{{ frappe.utils.fmt_money(quote_total, currency="ZAR") }}</span>
+          </div>
+        {% else %}
+          <p style="font-size:12.5px;color:#64748b;margin-bottom:0.75rem;">Your Quote List is currently empty. You can browse products to add items or simply describe what you need in the form on the left and we will create a custom lead &amp; proposal for you.</p>
+          <a href="/all-products" style="display:inline-block;background:#132a2e;color:#fff;font-size:12px;font-weight:600;padding:7px 14px;border-radius:6px;text-decoration:none;">Browse Catalogue →</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+frappe.ready(function () {
+  var form = document.getElementById('psa-rfq-form');
+  var resBox = document.getElementById('psa-rfq-result');
+  var btn = document.getElementById('psa-rfq-submit');
+  if (!form) return;
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(form);
+    btn.disabled = true;
+    btn.textContent = 'Submitting Request...';
+
+    frappe.call({
+      method: 'promo_theme.api.submit_guest_quote',
+      args: {
+        full_name: fd.get('full_name'),
+        email: fd.get('email'),
+        phone: fd.get('phone'),
+        company: fd.get('company'),
+        notes: fd.get('notes')
+      },
+      callback: function (r) {
+        btn.disabled = false;
+        btn.textContent = 'Submit Quote & Mockup Request →';
+        var msg = (r && r.message) || {};
+        resBox.style.display = 'block';
+        resBox.style.background = '#f0fdf4';
+        resBox.style.border = '1px solid #86efac';
+        resBox.style.color = '#14532d';
+        resBox.innerHTML = '<strong>Thank you!</strong> Your request has been received' +
+          (msg.quotation ? ' (Reference: <b>' + frappe.utils.escape_html(msg.quotation) + '</b>)' : '') +
+          '. Our sales team will send your quote and digital mockup shortly.';
+        form.reset();
+      },
+      error: function () {
+        btn.disabled = false;
+        btn.textContent = 'Submit Quote & Mockup Request →';
+      }
+    });
+  });
+});
+</script>
+{% endblock %}
