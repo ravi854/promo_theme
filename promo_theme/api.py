@@ -1663,15 +1663,28 @@ def bulk_publish_items_to_website(item_codes):
             continue
         if frappe.db.exists("Item", code):
             item_doc = frappe.get_doc("Item", code)
-            make_website_item(item_doc, save=True)
+            make_website_item(item_doc.as_dict(), save=True)
             created += 1
 
     frappe.db.commit()
     return {"created": created, "published": published}
 
 
+def _publish_single_item_worker(item_code):
+    if not item_code or frappe.db.exists("Website Item", {"item_code": item_code}):
+        return
+    try:
+        from webshop.webshop.doctype.website_item.website_item import make_website_item
+
+        item_doc = frappe.get_doc("Item", item_code)
+        make_website_item(item_doc.as_dict(), save=True)
+        frappe.db.commit()
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Auto-Publish Website Item Failed: {item_code}")
+
+
 def auto_publish_item_on_insert(doc, method=None):
-    """Automatically create and publish a Website Item when a new Sales Item is inserted."""
+    """Queue Website Item creation after commit so webshop on_update never sees doc_before_save=None."""
     if not doc or doc.doctype != "Item":
         return
     if doc.disabled or doc.has_variants or not doc.is_sales_item or doc.item_code == "COD-DELIVERY":
@@ -1681,12 +1694,8 @@ def auto_publish_item_on_insert(doc, method=None):
     if not enabled:
         return
 
-    if frappe.db.exists("Website Item", {"item_code": doc.item_code}):
-        return
-
-    try:
-        from webshop.webshop.doctype.website_item.website_item import make_website_item
-
-        make_website_item(doc, save=True)
-    except Exception:
-        frappe.log_error(frappe.get_traceback(), f"Auto-Publish Website Item Failed: {doc.item_code}")
+    frappe.enqueue(
+        "promo_theme.api._publish_single_item_worker",
+        item_code=doc.item_code,
+        enqueue_after_commit=True,
+    )
