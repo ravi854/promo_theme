@@ -328,6 +328,7 @@ fixtures = [
                 "Webshop Settings-volumetric_weight_divisor",
                 "Webshop Settings-road_freight_rate_per_kg",
                 "Webshop Settings-auto_mr_only_shortage",
+                "Webshop Settings-auto_publish_new_items",
                 "Webshop Settings-promo_banner_btn_link",
                 "Webshop Settings-enable_google_merchant_feed",
                 "Webshop Settings-meta_pixel_id",
@@ -392,7 +393,10 @@ fixtures = [
 doc_events = {
     "Sales Order": {
         "on_submit": "promo_theme.api.auto_create_material_request_for_so",
-    }
+    },
+    "Item": {
+        "after_insert": "promo_theme.api.auto_publish_item_on_insert",
+    },
 }
 
 app_include_js = ["/assets/promo_theme/js/item_list.js?v=4"]

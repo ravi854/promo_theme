@@ -1668,3 +1668,25 @@ def bulk_publish_items_to_website(item_codes):
 
     frappe.db.commit()
     return {"created": created, "published": published}
+
+
+def auto_publish_item_on_insert(doc, method=None):
+    """Automatically create and publish a Website Item when a new Sales Item is inserted."""
+    if not doc or doc.doctype != "Item":
+        return
+    if doc.disabled or doc.has_variants or not doc.is_sales_item or doc.item_code == "COD-DELIVERY":
+        return
+
+    enabled = bool(frappe.db.get_single_value("Webshop Settings", "auto_publish_new_items"))
+    if not enabled:
+        return
+
+    if frappe.db.exists("Website Item", {"item_code": doc.item_code}):
+        return
+
+    try:
+        from webshop.webshop.doctype.website_item.website_item import make_website_item
+
+        make_website_item(doc, save=True)
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Auto-Publish Website Item Failed: {doc.item_code}")
