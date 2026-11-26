@@ -1884,3 +1884,74 @@ def sync_erpnext_lead_to_frappe_crm(doc, method=None):
         crm_lead.insert()
     except Exception:
         frappe.log_error(frappe.get_traceback(), f"Sync to Frappe CRM Lead Failed: {doc.get('name')}")
+
+
+@frappe.whitelist(allow_guest=True)
+def get_product_jsonld(route):
+    """Return Schema.org Product JSON-LD payload if enabled in Webshop Settings."""
+    if not bool(frappe.db.get_single_value("Webshop Settings", "enable_google_jsonld")):
+        return None
+
+    clean_route = (route or "").strip().lstrip("/")
+    if not clean_route:
+        return None
+
+    wi = frappe.db.get_value(
+        "Website Item",
+        {"route": clean_route, "published": 1},
+        ["item_code", "web_item_name", "item_name", "website_image", "short_description", "description", "brand"],
+        as_dict=True,
+    )
+    if not wi:
+        return None
+
+    price_list = (
+        frappe.db.get_single_value("Webshop Settings", "price_list")
+        or frappe.db.get_single_value("Selling Settings", "selling_price_list")
+        or "Standard Selling"
+    )
+    currency = frappe.db.get_value("Price List", price_list, "currency") or "ZAR"
+    rate = float(
+        frappe.db.get_value(
+            "Item Price",
+            {"item_code": wi.item_code, "price_list": price_list, "selling": 1},
+            "price_list_rate",
+        )
+        or 0.0
+    )
+
+    site_url = frappe.utils.get_url().rstrip("/")
+    img = (wi.website_image or "").strip()
+    if img and not img.startswith("http"):
+        img = f"{site_url}/{img.lstrip('/')}"
+
+    qty = float(
+        frappe.db.sql("SELECT COALESCE(SUM(actual_qty), 0) FROM `tabBin` WHERE item_code=%s", (wi.item_code,))[0][0]
+        or 0.0
+    )
+
+    payload = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": wi.web_item_name or wi.item_name or wi.item_code,
+        "sku": wi.item_code,
+        "mpn": wi.item_code,
+        "description": frappe.utils.strip_html(wi.short_description or wi.description or wi.web_item_name or ""),
+        "url": f"{site_url}/{clean_route}",
+        "brand": {
+            "@type": "Brand",
+            "name": wi.brand or frappe.defaults.get_global_default("company") or "PrintStoreAmaze",
+        },
+        "offers": {
+            "@type": "Offer",
+            "url": f"{site_url}/{clean_route}",
+            "priceCurrency": currency,
+            "price": f"{rate:.2f}",
+            "availability": "https://schema.orgInStock" if qty > 0 else "https://schema.orgPreOrder",
+            "itemCondition": "https://schema.orgNewCondition",
+        },
+    }
+    if img:
+        payload["image"] = [img]
+
+    return payload

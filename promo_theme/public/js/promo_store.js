@@ -610,3 +610,23 @@ frappe.ready(function () {
   setTimeout(insertCartQuoteBtn, 400);
   setTimeout(insertCartQuoteBtn, 1100);
 });
+
+frappe.ready(function () {
+  var path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  if (!path || path === 'all-products' || path === 'cart' || path === 'request-for-quotation' || path === 'promo_home') return;
+  if (document.getElementById('psa-product-jsonld')) return;
+
+  frappe.call({
+    method: 'promo_theme.api.get_product_jsonld',
+    args: { route: path },
+    callback: function (r) {
+      if (r && r.message && r.message['@type'] === 'Product') {
+        var s = document.createElement('script');
+        s.id = 'psa-product-jsonld';
+        s.type = 'application/ld+json';
+        s.textContent = JSON.stringify(r.message);
+        document.head.appendChild(s);
+      }
+    }
+  });
+});

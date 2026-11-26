@@ -8,7 +8,7 @@ app_license = "mit"
 web_include_css = ["/assets/promo_theme/css/promo_store.css?v=49"]
 
 web_include_js = [
-    "/assets/promo_theme/js/promo_store.js?v=17",
+    "/assets/promo_theme/js/promo_store.js?v=18",
     "/assets/promo_theme/js/variant_swatches.js?v=8",
     "/assets/promo_theme/js/promo_header.js?v=27",
 	"/assets/promo_theme/js/promo_footer.js?v=3",
@@ -329,6 +329,7 @@ fixtures = [
                 "Webshop Settings-road_freight_rate_per_kg",
                 "Webshop Settings-auto_mr_only_shortage",
                 "Webshop Settings-auto_publish_new_items",
+                "Webshop Settings-enable_google_jsonld",
                 "Webshop Settings-promo_banner_btn_link",
                 "Webshop Settings-enable_google_merchant_feed",
                 "Webshop Settings-meta_pixel_id",
