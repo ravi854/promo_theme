@@ -1955,3 +1955,97 @@ def get_product_jsonld(route):
         payload["image"] = [img]
 
     return payload
+
+
+def _collect_item_images(wi_doc):
+    """Return ordered, deduplicated list of image URLs from Website Image, Slideshow, and File attachments."""
+    urls = []
+    seen = set()
+
+    def _add(url):
+        u = (url or "").strip()
+        if not u or u in seen:
+            return
+        lower = u.lower()
+        if not (lower.startswith("http") or lower.startswith("/")) and "." not in lower:
+            return
+        if any(lower.endswith(ext) for ext in (".pdf", ".zip", ".csv", ".xlsx", ".doc", ".docx")):
+            return
+        seen.add(u)
+        urls.append(u)
+
+    _add(wi_doc.get("website_image"))
+
+    if wi_doc.get("slideshow") and frappe.db.exists("Website Slideshow", wi_doc.get("slideshow")):
+        slides = frappe.get_all(
+            "Website Slideshow Item",
+            filters={"parent": wi_doc.get("slideshow")},
+            fields=["image"],
+            order_by="idx asc",
+        )
+        for s in slides:
+            _add(s.image)
+
+    item_img = frappe.db.get_value("Item", wi_doc.get("item_code"), "image")
+    _add(item_img)
+
+    for dt, dn in (("Website Item", wi_doc.get("name")), ("Item", wi_doc.get("item_code"))):
+        if not dn:
+            continue
+        files = frappe.get_all(
+            "File",
+            filters={"attached_to_doctype": dt, "attached_to_name": dn, "is_private": 0},
+            fields=["file_url"],
+            order_by="creation asc",
+        )
+        for f in files:
+            _add(f.file_url)
+
+    return urls
+
+
+@frappe.whitelist(allow_guest=True)
+def get_product_gallery(route):
+    """Return all gallery images for a Website Item route."""
+    clean_route = (route or "").strip().lstrip("/")
+    if not clean_route:
+        return []
+
+    wi = frappe.db.get_value(
+        "Website Item",
+        {"route": clean_route, "published": 1},
+        ["name", "item_code", "website_image", "slideshow"],
+        as_dict=True,
+    )
+    if not wi:
+        return []
+
+    return _collect_item_images(wi)
+
+
+@frappe.whitelist(allow_guest=True)
+def get_listing_secondary_images(item_codes=None):
+    """Return {item_code: second_image_url} for hover-swap on product cards."""
+    if isinstance(item_codes, str):
+        import json
+
+        try:
+            item_codes = json.loads(item_codes)
+        except Exception:
+            item_codes = [c.strip() for c in item_codes.split(",") if c.strip()]
+
+    if not item_codes:
+        return {}
+
+    wis = frappe.get_all(
+        "Website Item",
+        filters={"item_code": ["in", list(set(item_codes))], "published": 1},
+        fields=["name", "item_code", "website_image", "slideshow"],
+    )
+
+    out = {}
+    for wi in wis:
+        imgs = _collect_item_images(wi)
+        if len(imgs) >= 2:
+            out[wi.item_code] = imgs[1]
+    return out
