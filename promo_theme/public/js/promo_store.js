@@ -630,3 +630,32 @@ frappe.ready(function () {
     }
   });
 });
+
+frappe.ready(function () {
+  var defaultWa = 'https://wa.me';
+  document.querySelectorAll('a').forEach(function (a) {
+    var href = (a.getAttribute('href') || '').trim();
+    var text = (a.textContent || '').trim().toLowerCase();
+    if (text.indexOf('whatsapp') !== -1 || href.indexOf('wa.me') !== -1 || href.indexOf('whatsapp.com') !== -1) {
+      if (!href || href === '#' || href.indexOf('wa.me/0') !== -1 || href.indexOf('wa.me/+') !== -1 || href.indexOf(' ') !== -1) {
+        a.setAttribute('href', defaultWa);
+      }
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+    }
+  });
+});
+
+frappe.ready(function () {
+  var fixWaLinks = function () {
+    document.querySelectorAll('a[href*="wa.me"]').forEach(function (a) {
+      var h = a.getAttribute('href') || '';
+      if (/^https?:\/\/wa\.me[0-9]/i.test(h)) {
+        a.setAttribute('href', h.replace(/^(https?:\/\/wa\.me)([0-9])/i, '$1/$2'));
+      }
+    });
+  };
+  fixWaLinks();
+  setTimeout(fixWaLinks, 500);
+  setTimeout(fixWaLinks, 1500);
+});

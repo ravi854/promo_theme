@@ -38,7 +38,7 @@ frappe.ready(() => {
             <button type="button" data-topic="artwork">Free Artwork</button>
             <button type="button" data-topic="delivery">Delivery &amp; Lead Times</button>
             <button type="button" data-topic="bulk">Bulk Discounts</button>
-            <a id="promo-chat-wa-link" href="https://wa.me{waNumber}" target="_blank" rel="noopener noreferrer" class="promo-chip-wa">
+            <a id="promo-chat-wa-link" href="https://wa.me" target="_blank" rel="noopener noreferrer" class="promo-chip-wa">
               WhatsApp Chat &#8599;
             </a>
           </div>
@@ -79,7 +79,7 @@ frappe.ready(() => {
     const updateWaHref = () => {
       const text = `Hi! I'm browsing ${window.location.href} and need help with a quote.`;
       const params = new URLSearchParams({ phone: waNumber, text });
-      waLink.href = 'https://wa.me?' + params.toString();
+      waLink.href = 'https://wa.me' + params.toString();
     };
     updateWaHref();
 

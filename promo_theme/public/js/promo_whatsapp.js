@@ -21,7 +21,7 @@ frappe.ready(() => {
       }
 
       const params = new URLSearchParams({ phone: waNumber, text: message });
-      return 'https://wa.me?' + params.toString();
+      return 'https://wa.me' + params.toString();
     };
 
     const btn = document.createElement('a');
