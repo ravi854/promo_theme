@@ -41,14 +41,67 @@ frappe.ready(function () {
       .psa-swatch-item:hover { transform: scale(1.12); border-color: #0f766e; }
       .psa-swatch-item.active { border: 2px solid #0f766e; box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #0f766e; transform: scale(1.08); }
       .psa-swatch-selected-label { font-size: 12px; font-weight: 700; color: #0f766e; margin-left: 6px; }
+
+      .psa-filter-color-dot {
+        width: 14px !important;
+        height: 14px !important;
+        min-width: 14px !important;
+        border-radius: 50% !important;
+        border: 1px solid #94a3b8 !important;
+        display: inline-block !important;
+        vertical-align: middle !important;
+        margin: 0 6px 0 4px !important;
+        box-shadow: inset 0 1px 1px rgba(255,255,255,0.5);
+        flex-shrink: 0;
+      }
     `;
     document.head.appendChild(st);
   }
 
+  var renderSidebarFilterDots = function () {
+    var checkboxes = document.querySelectorAll('#product-filters input[type="checkbox"], .product-filter-section input[type="checkbox"], input.product-filter[type="checkbox"], .sidebar input[type="checkbox"]');
+    checkboxes.forEach(function (cb) {
+      var container = cb.closest('.checkbox, .filter-option, .form-check, label, div');
+      if (!container || container.querySelector('.psa-filter-color-dot')) return;
+
+      var labelEl = container.tagName === 'LABEL' ? container : (container.querySelector('label, .label-area, span') || container);
+      var rawVal = (
+        cb.getAttribute('data-filter-value') ||
+        cb.getAttribute('data-attribute-value') ||
+        cb.getAttribute('data-value') ||
+        cb.value ||
+        labelEl.textContent ||
+        ''
+      ).trim().toLowerCase();
+
+      var entry = COLOR_MAP[rawVal];
+      if (!entry) return;
+
+      var dot = document.createElement('span');
+      dot.className = 'psa-filter-color-dot';
+      dot.style.setProperty('background-color', entry.hex, 'important');
+      dot.style.setProperty('background', entry.bg, 'important');
+
+      if (cb.parentNode === labelEl) {
+        cb.insertAdjacentElement('afterend', dot);
+      } else if (labelEl && labelEl !== cb) {
+        labelEl.insertBefore(dot, labelEl.firstChild);
+      } else {
+        cb.insertAdjacentElement('afterend', dot);
+      }
+    });
+  };
+
   var applyColors = function () {
-    // 1. Patch any native Webshop/Theme swatch circles already rendered in the DOM
-    var nativeSwatches = Array.from(document.querySelectorAll('.color-swatch, .swatch, [data-attribute-value], [data-value]'));
+    renderSidebarFilterDots();
+
+    // Product Detail Page: Patch native Webshop swatch circles (exclude inputs/labels/sidebar)
+    var nativeSwatches = Array.from(document.querySelectorAll('.color-swatch, .swatch, .item-variants [data-attribute-value], .product-details [data-attribute-value]'));
     nativeSwatches.forEach(function (el) {
+      if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'OPTION' || el.tagName === 'LABEL') return;
+      if (el.closest('#product-filters, .filter-section, .sidebar')) return;
+      if (el.offsetWidth > 48 || el.offsetHeight > 48) return;
+
       var raw = (
         el.getAttribute('data-attribute-value') ||
         el.getAttribute('data-value') ||
@@ -59,19 +112,20 @@ frappe.ready(function () {
       ).trim().toLowerCase();
       var entry = COLOR_MAP[raw];
       if (!entry) return;
-      // Only colour circle elements (avoid re-backgrounding full text pills/buttons)
-      if (el.tagName === 'SELECT' || el.tagName === 'OPTION' || el.offsetWidth > 60) return;
+
       el.style.setProperty('background-color', entry.hex, 'important');
       el.style.setProperty('background', entry.bg, 'important');
     });
 
-    // 2. Also build custom swatches next to any Colour <select> dropdowns
-    var selects = Array.from(document.querySelectorAll('select.variant-select, select[data-attribute], .item-variants select, select'));
+    // Product Detail Page: Build custom swatches next to any Colour <select> dropdowns
+    var selects = Array.from(document.querySelectorAll('.item-variants select, .product-details select, select.variant-select, select[data-attribute]'));
     selects.forEach(function (sel) {
       if (sel.dataset.psaSwatchesBound === '1') return;
+      if (sel.closest('#product-filters, .filter-section, .sidebar')) return;
 
       var attrName = (sel.getAttribute('data-attribute') || sel.name || sel.id || '').toLowerCase();
-      var labelEl = sel.closest('.form-group, .variant-attribute, div') && sel.closest('.form-group, .variant-attribute, div').querySelector('label, .attribute-name, span');
+      var holder = sel.closest('.form-group, .variant-attribute, div');
+      var labelEl = holder && holder.querySelector('label, .attribute-name, span');
       var labelText = (labelEl ? labelEl.textContent : '').toLowerCase();
 
       var validOptions = Array.from(sel.options).filter(function (o) {
@@ -128,4 +182,11 @@ frappe.ready(function () {
   setTimeout(applyColors, 350);
   setTimeout(applyColors, 950);
   setTimeout(applyColors, 1800);
+
+  if (window.MutationObserver && document.body) {
+    var obs = new MutationObserver(function () {
+      renderSidebarFilterDots();
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
 });
