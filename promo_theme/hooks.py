@@ -43,7 +43,7 @@ template_apps = ["builder", "promo_theme", "webshop", "helpdesk", "raven", "crm"
 # add_to_apps_screen = [
 # 	{
 # 		"name": "promo_theme",
-# 		"logo": "/assets/promo_theme/logo.png",
+# 		"logo": "/files/a1its_logo1.png",
 # 		"title": "Promo Theme",
 # 		"route": "/promo_theme",
 # 		"has_permission": "promo_theme.api.permission.has_app_permission",
@@ -406,4 +406,6 @@ doc_events = {
     },
 }
 
-app_include_js = ["/assets/promo_theme/js/item_list.js?v=4"]
+
+app_include_js = ["/assets/promo_theme/js/promo_desk_logo.js?v=4"]
+extend_bootinfo = "promo_theme.api.extend_bootinfo"

@@ -1409,15 +1409,23 @@ def _build_cart_parcels(party_name=None, cart_id=None, qname_override=None):
 @rate_limit(limit=25, seconds=60)
 def get_webshop_shipping_rates(address_line1="", city="", state="Gauteng", pincode="", cart_total=0):
     active_qname = None
+    server_cart_total = 0.0
     try:
         from webshop.webshop.shopping_cart.cart import _get_cart_quotation
-        _qo = _get_cart_quotation()
+        cookies = getattr(frappe, "request", None) and frappe.request.cookies or {}
+        p_name = cookies.get("party_name")
+        _qo = _get_cart_quotation(party_name=p_name) if p_name else _get_cart_quotation()
         _qdoc = _qo.get("doc") if isinstance(_qo, dict) else _qo
         if _qdoc and getattr(_qdoc, "name", None):
             active_qname = _qdoc.name
+            server_cart_total = sum(
+                float(i.amount or 0)
+                for i in (getattr(_qdoc, "items", None) or [])
+                if i.item_code != "COD-DELIVERY"
+            )
     except Exception:
         active_qname = None
-    cart_total = float(cart_total or 0)
+    cart_total = max(float(cart_total or 0), server_cart_total)
     flat_fee = float(frappe.db.get_single_value("Webshop Settings", "cod_delivery_charge") or 150)
     free_over = float(frappe.db.get_single_value("Webshop Settings", "cod_free_delivery_over") or 1500)
 
@@ -2049,3 +2057,19 @@ def get_listing_secondary_images(item_codes=None):
         if len(imgs) >= 2:
             out[wi.item_code] = imgs[1][1]
     return out
+
+
+def extend_bootinfo(bootinfo):
+    """Override Frappe v16 Desk left-strip app logo using Website Settings -> App Logo."""
+    custom_logo = (
+        frappe.db.get_single_value("Website Settings", "app_logo")
+        or frappe.db.get_single_value("Navbar Settings", "app_logo")
+        or "/files/a1its_logo1.png"
+    )
+    if not custom_logo or "erpnext-logo" in custom_logo or "frappe-framework-logo" in custom_logo:
+        custom_logo = "/files/a1its_logo1.png"
+
+    bootinfo.app_logo_url = custom_logo
+    for app in bootinfo.get("app_data") or []:
+        if app.get("app_name") in ("erpnext", "frappe", "promo_theme"):
+            app["app_logo_url"] = custom_logo
