@@ -2047,5 +2047,5 @@ def get_listing_secondary_images(item_codes=None):
     for wi in wis:
         imgs = _collect_item_images(wi)
         if len(imgs) >= 2:
-            out[wi.item_code] = imgs[1]
+            out[wi.item_code] = imgs[1][1]
     return out
